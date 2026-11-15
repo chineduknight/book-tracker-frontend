@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens: a quiet, modern reading room.
+ *
+ * Every colour the UI uses is defined once here, as a CSS variable, and exposed to Tailwind through
+ * @theme. Components use the semantic utilities (bg-canvas, text-ink, border-line, ...), never raw
+ * palette values, so light and dark themes cannot drift apart. The theme follows the operating system
+ * preference; there is no client-side toggle, so there is nothing to hydrate and no theme flash.
+ *
+ * Contrast targets (checked by scripts/check-contrast.mjs and axe in e2e/accessibility.spec.ts):
+ * text ≥ 4.5:1 on canvas and surface, interactive borders and focus rings ≥ 3:1.
+ */
+:root {
+  color-scheme: light;
+
+  --canvas: #f6f3ec;
+  --surface: #fffdf8;
+  --surface-muted: #eee9df;
+  --ink: #1e1b16;
+  --ink-muted: #59534a;
+  --line: #e0d9cc;
+  --line-strong: #857c6d;
+  --accent: #2d5a43;
+  --accent-hover: #224633;
+  --accent-soft: #e1ebe3;
+  --accent-ink: #1f4a35;
+  --on-accent: #ffffff;
+  --danger: #9b2c22;
+  --danger-soft: #f8e7e3;
+  --focus: #2d5a43;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --canvas: #141311;
+    --surface: #1c1a17;
+    --surface-muted: #26231f;
+    --ink: #ede7dc;
+    --ink-muted: #b3aa9b;
+    --line: #34302a;
+    --line-strong: #7f7769;
+    --accent: #8fc7a5;
+    --accent-hover: #a9d7ba;
+    --accent-soft: #1e3128;
+    --accent-ink: #b4e0c4;
+    --on-accent: #0f2219;
+    --danger: #f2a497;
+    --danger-soft: #3a1f1b;
+    --focus: #8fc7a5;
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-focus: var(--focus);
+
+  /* System fonts only: nothing is fetched at runtime. */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+  --font-serif:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', 'URW Palladio L', Georgia,
+    'Noto Serif', serif;
+
+  /* Height of the phone bottom navigation, excluding the safe-area inset. */
+  --spacing-nav: 4.5rem;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+/* No motion survives a reduced-motion preference, including anything added later by mistake. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
