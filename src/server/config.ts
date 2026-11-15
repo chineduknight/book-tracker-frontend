@@ -14,9 +14,16 @@ export interface BffConfig {
    * a reachable deployment always gets `Secure` `__Host-` cookies.
    */
   isHttps: boolean;
-  sessionStore: { uri: string; databaseName: string };
+  sessionStore: SessionStoreLocation;
   /** 32 random bytes, the root of the session encryption and verifier keys. */
   sessionMasterKey: Buffer;
+}
+
+export interface SessionStoreLocation {
+  uri: string;
+  databaseName: string;
+  /** True for every non-loopback server: the connection must be TLS with full verification. */
+  requiresTls: boolean;
 }
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -48,7 +55,10 @@ export function loadBffConfig(env: Environment = process.env): BffConfig {
   const appOrigin = parseAppOrigin(read('APP_ORIGIN'), problems);
   const isHttps = appOrigin?.startsWith('https://') ?? false;
   const apiBaseUrl = parseApi(read('API_BASE_URL'), isHttps, problems);
-  const sessionStore = parseSessionStoreUri(read('BFF_SESSION_MONGODB_URI'), isHttps, problems);
+  const sessionStoreUri = read('BFF_SESSION_MONGODB_URI');
+  const sessionStore = sessionStoreUri
+    ? parseSessionStoreUri(sessionStoreUri, isHttps, problems)
+    : undefined;
   const sessionMasterKey = parseEncryptionKey(read('BFF_SESSION_ENCRYPTION_KEY'), problems);
 
   if (problems.length > 0 || !appOrigin || !apiBaseUrl || !sessionStore || !sessionMasterKey) {
@@ -122,8 +132,14 @@ function parseApi(value: string | undefined, isHttps: boolean, problems: Problem
   return apiBaseUrl;
 }
 
-function parseSessionStoreUri(value: string | undefined, isHttps: boolean, problems: Problem[]) {
-  if (!value) return undefined;
+const TLS_SWITCHES = ['tls', 'ssl'];
+const TLS_WEAKENERS = ['tlsinsecure', 'tlsallowinvalidcertificates', 'tlsallowinvalidhostnames'];
+
+function parseSessionStoreUri(
+  value: string,
+  isHttps: boolean,
+  problems: Problem[],
+): SessionStoreLocation | undefined {
   const variable = 'BFF_SESSION_MONGODB_URI';
   const match = /^mongodb(\+srv)?:\/\/(?:[^@/]*@)?([^/?]+)\/([^?]*)(\?.*)?$/.exec(value);
   if (!match) {
@@ -133,6 +149,7 @@ function parseSessionStoreUri(value: string | undefined, isHttps: boolean, probl
     });
     return undefined;
   }
+  const isSrv = match[1] !== undefined;
   const hosts = (match[2] ?? '').split(',').map((host) => host.replace(/:\d+$/, ''));
   const databaseName = decodeURIComponent(match[3] ?? '');
   if (!DATABASE_NAME.test(databaseName) || RESERVED_DATABASES.has(databaseName)) {
@@ -149,7 +166,40 @@ function parseSessionStoreUri(value: string | undefined, isHttps: boolean, probl
     });
     return undefined;
   }
-  return { uri: value, databaseName };
+
+  const requiresTls = isSrv || !hosts.every(isLoopbackHost);
+  if (requiresTls) {
+    const tlsProblem = remoteTlsProblemOf(new URLSearchParams(match[4]?.slice(1) ?? ''), isSrv);
+    if (tlsProblem) {
+      problems.push({ variable, rule: tlsProblem });
+      return undefined;
+    }
+  }
+  return { uri: value, databaseName, requiresTls };
+}
+
+/**
+ * A remote session store carries database credentials and session metadata, so its connection must
+ * be TLS with certificate and hostname checks. MongoDB option names are case-insensitive, and SRV
+ * connections default to TLS; anything that disables or weakens it is refused.
+ */
+function remoteTlsProblemOf(options: URLSearchParams, isSrv: boolean): string | undefined {
+  const valuesOf = (names: string[]) =>
+    [...options]
+      .filter(([name]) => names.includes(name.toLowerCase()))
+      .map(([, setting]) => setting.toLowerCase());
+
+  const tlsSettings = valuesOf(TLS_SWITCHES);
+  if (tlsSettings.some((setting) => setting !== 'true')) {
+    return 'must not disable TLS for a remote MongoDB server';
+  }
+  if (!isSrv && tlsSettings.length === 0) {
+    return 'must enable TLS (tls=true) for a remote MongoDB server';
+  }
+  if (valuesOf(TLS_WEAKENERS).some((setting) => setting !== 'false')) {
+    return 'must not weaken TLS certificate or hostname validation';
+  }
+  return undefined;
 }
 
 function parseEncryptionKey(value: string | undefined, problems: Problem[]) {

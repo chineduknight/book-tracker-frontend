@@ -7,20 +7,18 @@
  * Reads BFF_SESSION_MONGODB_URI (and APP_ORIGIN for its production rules). Prints index names and
  * outcomes only, never the URI.
  */
-import { MongoClient } from 'mongodb';
 import { loadSessionStoreLocation } from '../src/server/config';
 import {
   SESSION_COLLECTION,
   createMissingSessionIndexes,
   inspectSessionIndexes,
 } from '../src/server/session/session-indexes';
+import { createSessionStoreClient } from '../src/server/session/session-store-client';
 
 const apply = process.argv.includes('--apply');
-const { uri, databaseName } = loadSessionStoreLocation();
-const client = new MongoClient(uri, {
-  appName: 'avuneri-bff-indexes',
-  serverSelectionTimeoutMS: 10_000,
-});
+const location = loadSessionStoreLocation();
+const { databaseName } = location;
+const client = createSessionStoreClient(location, 'avuneri-bff-indexes');
 
 try {
   const collection = client.db(databaseName).collection(SESSION_COLLECTION);

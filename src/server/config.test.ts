@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { BffConfigError, loadBffConfig } from './config';
+import { BffConfigError, loadBffConfig, loadSessionStoreLocation } from './config';
 
 const KEY = randomBytes(32).toString('base64url');
 
@@ -111,5 +111,80 @@ describe('loadBffConfig', () => {
     expect(message).not.toContain('s3cret-password');
     expect(message).not.toContain('short-secret-value');
     expect(message).not.toContain('wrong-prefix');
+  });
+});
+
+describe('session store transport security', () => {
+  const REMOTE = 'bff-user:s3cret-password@db.example.net:27017';
+
+  it.each([
+    ['plain mongodb:// to a remote host', `mongodb://${REMOTE}/avuneri-bff`],
+    [
+      'an SRV URI with tls=false',
+      'mongodb+srv://cluster0.example.mongodb.net/avuneri-bff?tls=false',
+    ],
+    [
+      'an SRV URI with ssl=false',
+      'mongodb+srv://cluster0.example.mongodb.net/avuneri-bff?ssl=false',
+    ],
+    ['a contradictory tls setting', `mongodb://${REMOTE}/avuneri-bff?tls=true&tls=false`],
+    ['tlsInsecure', `mongodb://${REMOTE}/avuneri-bff?tls=true&tlsInsecure=true`],
+    [
+      'unchecked certificates',
+      'mongodb+srv://cluster0.example.mongodb.net/avuneri-bff?tlsAllowInvalidCertificates=true',
+    ],
+    [
+      'unchecked hostnames',
+      'mongodb+srv://cluster0.example.mongodb.net/avuneri-bff?TLSAllowInvalidHostnames=TRUE',
+    ],
+  ])('refuses %s, for deployed and local origins alike', (_name, uri) => {
+    for (const env of [deployed, local]) {
+      const message = problemsOf({ ...env, BFF_SESSION_MONGODB_URI: uri });
+      expect(message).toContain('BFF_SESSION_MONGODB_URI');
+      expect(message).toMatch(/TLS/);
+      expect(message).not.toContain('s3cret-password');
+      expect(message).not.toContain('db.example.net');
+    }
+    expect(() => loadSessionStoreLocation({ BFF_SESSION_MONGODB_URI: uri })).toThrow(
+      BffConfigError,
+    );
+  });
+
+  it.each([
+    [
+      'an SRV URI (TLS by default)',
+      'mongodb+srv://u:p@cluster0.example.mongodb.net/avuneri-bff?retryWrites=true',
+    ],
+    ['an SRV URI with tls=true', 'mongodb+srv://cluster0.example.mongodb.net/avuneri-bff?tls=true'],
+    ['mongodb:// with tls=true', `mongodb://${REMOTE}/avuneri-bff?tls=true`],
+    ['mongodb:// with ssl=TRUE', `mongodb://${REMOTE}/avuneri-bff?ssl=TRUE&replicaSet=rs0`],
+    [
+      'certificate checks explicitly kept',
+      `mongodb://${REMOTE}/avuneri-bff?tls=true&tlsAllowInvalidCertificates=false`,
+    ],
+  ])('accepts %s and requires TLS for it', (_name, uri) => {
+    expect(loadBffConfig({ ...deployed, BFF_SESSION_MONGODB_URI: uri }).sessionStore).toMatchObject(
+      {
+        databaseName: 'avuneri-bff',
+        requiresTls: true,
+      },
+    );
+  });
+
+  it('requires TLS when any listed host is remote', () => {
+    const mixed = 'mongodb://127.0.0.1:27017,db.example.net:27017/avuneri-bff';
+    expect(problemsOf({ ...local, BFF_SESSION_MONGODB_URI: mixed })).toMatch(/TLS/);
+    expect(problemsOf({ ...deployed, BFF_SESSION_MONGODB_URI: mixed })).toContain(
+      'BFF_SESSION_MONGODB_URI',
+    );
+  });
+
+  it('keeps the plaintext exception for a loopback development database only', () => {
+    expect(loadBffConfig(local).sessionStore.requiresTls).toBe(false);
+    expect(
+      loadSessionStoreLocation({ BFF_SESSION_MONGODB_URI: local.BFF_SESSION_MONGODB_URI }),
+    ).toMatchObject({
+      requiresTls: false,
+    });
   });
 });

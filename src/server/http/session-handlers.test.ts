@@ -24,7 +24,11 @@ function runtimeFor(appOrigin: string, storeOverride?: SessionStore): BffRuntime
     apiBaseUrl: 'https://api.avuneri.example/api/v1',
     appOrigin,
     isHttps: appOrigin.startsWith('https://'),
-    sessionStore: { uri: 'mongodb://unused/avuneri-bff', databaseName: 'avuneri-bff' },
+    sessionStore: {
+      uri: 'mongodb://127.0.0.1/avuneri-bff',
+      databaseName: 'avuneri-bff',
+      requiresTls: false,
+    },
     sessionMasterKey: randomBytes(32),
   };
   const sessions = createSessionService({
