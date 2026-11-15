@@ -3,10 +3,12 @@ import { NotebookPen } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { findDestination } from '@/config/navigation';
+import { requireSignedInProfile } from '@/server/current-session';
 
 export const metadata: Metadata = { title: 'Notes' };
 
-export default function NotesPage() {
+export default async function NotesPage() {
+  await requireSignedInProfile();
   const { label, summary } = findDestination('/notes');
 
   return (

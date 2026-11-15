@@ -1,7 +1,13 @@
 # Frontend decisions
 
-Decisions made in FE #15 (Frontend Foundation), with the reasoning, so later milestones can build
-on them or revisit them deliberately.
+Decisions made in FE #15 (Frontend Foundation) and FE #16 (Avuneri branding, authentication and
+sessions), with the reasoning, so later milestones can build on them or revisit them deliberately.
+
+## Product name
+
+The product is **Avuneri**. Repository and package names stay `book-tracker-frontend` and
+`book-tracker-backend`. Branding is a typographic wordmark plus a simple open-book mark in the
+existing palette; there are no remote fonts or images.
 
 ## Separate repository
 
@@ -11,25 +17,27 @@ TypeScript, Prettier settings, Vitest, CI shape) but no code.
 
 ## Stack and versions
 
-| Concern    | Choice                                             | Note                                                                                                                                                                                 |
-| ---------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Framework  | Next.js 16.4 (App Router, `src/`), React 19.3      | Pinned exactly: a patched stable release matters for security fixes. No canary.                                                                                                      |
-| Language   | TypeScript ~6.0, strict                            | `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`. TS 7 is out, but `typescript-eslint` supports `<6.1`. Matches the backend.                                                 |
-| Lint       | ESLint 9.39 + `eslint-config-next`                 | ESLint 10 is out, but Next's React/import/jsx-a11y plugins do not support it yet.                                                                                                    |
-| Styling    | Tailwind CSS 4 via `@tailwindcss/postcss`          | Tokens are CSS variables exposed with `@theme inline`.                                                                                                                               |
-| Icons      | `lucide-react`                                     | Always decorative (`aria-hidden`), next to a visible text label.                                                                                                                     |
-| Classes    | `clsx` + `tailwind-merge`                          | Only through `cn()` in `src/lib/utils.ts`.                                                                                                                                           |
-| Tests      | Vitest + Testing Library + jsdom; Playwright + axe |                                                                                                                                                                                      |
-| Validation | No `zod` yet                                       | The only runtime check needed is the response envelope, which needs a few small guards. DTO schemas can arrive with the features that use them, through the client's `parse` option. |
+| Concern    | Choice                                             | Note                                                                                                                                                                                                                                                           |
+| ---------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework  | Next.js 16.4 (App Router, `src/`), React 19.3      | Pinned exactly: a patched stable release matters for security fixes. No canary.                                                                                                                                                                                |
+| Language   | TypeScript ~6.0, strict                            | `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`. TS 7 is out, but `typescript-eslint` supports `<6.1`. Matches the backend.                                                                                                                           |
+| Lint       | ESLint 9.39 + `eslint-config-next`                 | ESLint 10 is out, but Next's React/import/jsx-a11y plugins do not support it yet.                                                                                                                                                                              |
+| Styling    | Tailwind CSS 4 via `@tailwindcss/postcss`          | Tokens are CSS variables exposed with `@theme inline`.                                                                                                                                                                                                         |
+| Icons      | `lucide-react`                                     | Always decorative (`aria-hidden`), next to a visible text label.                                                                                                                                                                                               |
+| Classes    | `clsx` + `tailwind-merge`                          | Only through `cn()` in `src/lib/utils.ts`.                                                                                                                                                                                                                     |
+| Tests      | Vitest + Testing Library + jsdom; Playwright + axe |                                                                                                                                                                                                                                                                |
+| Validation | `zod` 4 (server only)                              | Added in FE #16 for the auth request schemas (mirroring the API's exactly) and for validating API auth responses before any token is stored. The browser forms use small shared rules (`credential-policy.ts`) instead, so zod stays out of the client bundle. |
+| Sessions   | `mongodb` 7.9 (pinned), `server-only`              | The durable BFF session store and the server/client boundary marker. `tsx` (dev) runs the operator index script.                                                                                                                                               |
 
 **Deferred deliberately:** TanStack Query, any global state library, React Hook Form, charts,
-shadcn/ui, Radix. Each should be adopted, selectively, by the milestone that genuinely needs it.
+shadcn/ui, Radix. FE #16's two forms and one disclosure menu did not need any of them. Each should be adopted, selectively, by the milestone that genuinely needs it.
 
 ## Routing: typed routes and a route group
 
-`typedRoutes` is on, so a link to a page that does not exist is a type error. All shell pages live
-in the `(app)` route group, which leaves room for FE #16 to add sign-in pages with a different
-layout without moving any URL.
+`typedRoutes` is on, so a link to a page that does not exist is a type error. Private pages live in
+the `(app)` route group, which owns the signed-in shell. `/login` and `/register` live in `(auth)`,
+in the same public frame as errors and the 404 page, so a signed-out visitor never sees the
+private navigation.
 
 ## One navigation element for every screen size
 
@@ -58,35 +66,38 @@ colour is a token, adding one later is a change to `:root` only.
 
 No page shows invented counts, sample books, fake borrowers, a fake search box or an Add button.
 Every link goes to a real route. Unfinished areas say "Coming soon" and describe what will arrive.
-`Skeleton` and `Input` are tested primitives for FE #16/#17. They are not shown, because nothing
-loads and there is no form yet.
+`Input` is used by the sign-in forms since FE #16. `Skeleton` remains a tested primitive for FE #17,
+unused until something genuinely loads.
 
-## Authentication is deferred to FE #16
+## Authentication: a server-side BFF with a durable session store (FE #16)
 
-FE #15 contains no sign-in, no token storage and no protected data. The API issues JSON bearer
-tokens: a 15-minute access token and a 30-day rotating, single-use refresh token with reuse
-detection. Browser storage for those is the open decision.
+The browser never holds an API token. It has one opaque HttpOnly cookie, and this Next.js app
+calls the API with bearer tokens from server code. Sessions live in a dedicated MongoDB database,
+encrypted, so any number of app instances can serve them. The design, threat model, refresh race
+handling and operational prerequisites are in
+[auth-session-architecture.md](auth-session-architecture.md).
 
-Rules already in force:
+Choices worth recording:
 
-- Never put access or refresh tokens in `localStorage`, `sessionStorage`, IndexedDB,
-  client-readable cookies, URLs, analytics or logs.
-- The API client accepts a token source only outside the browser (it throws if `window` exists).
-- No `NEXT_PUBLIC_` configuration, no blind `/api/*` proxy and no mutating Server Actions.
+- **Durable store, not a sealed cookie.** A stateless encrypted cookie holding the refresh token
+  could not coordinate single-use refresh across concurrent requests and instances. A lost
+  `Set-Cookie` would also strand a rotated token. Process memory is never the source of truth.
+- **One refresh per session, decided by MongoDB.** An atomic compare-and-swap claim with a fenced
+  completion. An uncertain refresh ends the session rather than retrying the old token.
+- **Route handlers, not Server Actions,** for sign-in, registration, logout and the current user.
+  They are explicit, testable and carry an exact Origin check. There is no generic proxy to the API.
+- **Authorization inside each page** (`requireSignedInProfile`), not only in a layout or the proxy,
+  verified against the API (`/auth/me`) on every render.
+- **No new UI libraries.** Forms are plain controlled inputs with shared validation rules.
 
-Recommendation to evaluate in FE #16: a **server-side Backend-for-Frontend** in Next.js. The browser
-holds only an HttpOnly, Secure, SameSite session cookie. Next.js server code keeps the refresh token
-server-side, exchanges it with the API and calls the API with the bearer token. Mutations get
-origin/CSRF protection. Compare it with direct browser-to-API calls, which would need the backend's
-CORS (`credentials: false` today) and token-delivery semantics to change. Settle the hosting and
-CORS configuration from BE #14 first. Refresh calls must be serialised, because a reused refresh
-token revokes the whole session.
+Still not built: password reset, email verification, account settings or deletion, "log out
+everywhere", MFA and social sign-in.
 
 ## API transport
 
 See the README's "Backend integration" section for the interface. Choices worth recording:
 
-- **Injected `fetch`** so tests and the future session layer control the transport. There is no
+- **Injected `fetch`** so tests and the session layer control the transport. There is no
   Axios and no generated client.
 - **Allowlisted, encoded paths** (`apiPath`) and a validated base URL (https, or http on loopback
   only; no credentials, query or fragment; must end with `/api/v1`). The final URL is checked to
@@ -105,5 +116,8 @@ See the README's "Backend integration" section for the interface. Choices worth 
 
 Every response sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
 `Referrer-Policy: strict-origin-when-cross-origin` and a restrictive `Permissions-Policy`, and
-`X-Powered-By` is off. A Content-Security-Policy is left for FE #16, once the session design fixes
-which origins the app talks to. Pages are `noindex`, and Next.js telemetry is disabled in CI.
+`X-Powered-By` is off. Since FE #16, the proxy also sends an enforced Content-Security-Policy with a
+fresh nonce per request and `'strict-dynamic'`: no `unsafe-inline`, and `unsafe-eval` only in
+development. It sends HSTS when `APP_ORIGIN` is https. Nonces require per-request rendering, so the
+root layout opts every page into dynamic rendering; private pages must never be prerendered anyway.
+Pages are `noindex`, and Next.js telemetry is disabled in CI.

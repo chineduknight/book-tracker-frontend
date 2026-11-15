@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { navLabels, pages } from './routes';
+import { registerViaApi } from './support/session';
+
+test.beforeEach(async ({ page }) => {
+  await registerViaApi(page);
+});
 
 const phoneWidths = [320, 390];
 const wideWidths = [768, 1024, 1440];

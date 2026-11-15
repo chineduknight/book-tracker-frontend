@@ -5,10 +5,12 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { findDestination, librarySections } from '@/config/navigation';
+import { requireSignedInProfile } from '@/server/current-session';
 
 export const metadata: Metadata = { title: 'Library' };
 
-export default function LibraryPage() {
+export default async function LibraryPage() {
+  await requireSignedInProfile();
   const { label, summary } = findDestination('/library');
 
   return (

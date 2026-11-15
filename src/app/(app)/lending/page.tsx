@@ -3,10 +3,12 @@ import { Repeat } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { findDestination } from '@/config/navigation';
+import { requireSignedInProfile } from '@/server/current-session';
 
 export const metadata: Metadata = { title: 'Lending' };
 
-export default function LendingPage() {
+export default async function LendingPage() {
+  await requireSignedInProfile();
   const { label, summary } = findDestination('/lending');
 
   return (

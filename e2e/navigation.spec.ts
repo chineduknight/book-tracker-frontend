@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { navLabels, pages } from './routes';
+import { registerViaApi } from './support/session';
+
+test.beforeEach(async ({ page }) => {
+  await registerViaApi(page);
+});
 
 function primaryNav(page: Page) {
   return page.getByRole('navigation', { name: 'Primary' });
@@ -29,12 +34,11 @@ test.describe('routes', () => {
     expect(new Set(headings).size).toBe(headings.length);
   });
 
-  test('an unknown address shows a helpful 404 inside the app shell', async ({ page }) => {
+  test('an unknown address shows a helpful 404 without private navigation', async ({ page }) => {
     const response = await page.goto('/no-such-page');
     expect(response?.status()).toBe(404);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Page not found');
-    await expect(primaryNav(page).getByRole('link')).toHaveText(navLabels);
-    await expect(primaryNav(page).locator('a[aria-current="page"]')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
 
     await page.getByRole('link', { name: 'Go to Home' }).click();
     await expect(page).toHaveURL('/');
@@ -71,11 +75,12 @@ test.describe('navigating', () => {
     await expect(page).toHaveURL('/notes');
   });
 
-  test('there are no buttons on the placeholder pages', async ({ page }) => {
-    // FE #15 has no actions; any button would be a dead control.
+  test('the placeholder pages hold no buttons, only the account menu does', async ({ page }) => {
+    // The library features have no actions yet; any button in a page would be a dead control.
     for (const { path } of pages) {
       await page.goto(path);
-      await expect(page.getByRole('button')).toHaveCount(0);
+      await expect(page.getByRole('main').getByRole('button')).toHaveCount(0);
+      await expect(page.getByRole('banner').getByRole('button')).toHaveCount(1);
     }
   });
 });

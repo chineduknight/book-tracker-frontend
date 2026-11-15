@@ -3,10 +3,12 @@ import { BookOpen } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { findDestination } from '@/config/navigation';
+import { requireSignedInProfile } from '@/server/current-session';
 
 export const metadata: Metadata = { title: 'Reading' };
 
-export default function ReadingPage() {
+export default async function ReadingPage() {
+  await requireSignedInProfile();
   const { label, summary } = findDestination('/reading');
 
   return (

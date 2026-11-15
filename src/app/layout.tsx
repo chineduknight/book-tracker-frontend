@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from 'next';
+import { connection } from 'next/server';
 import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: 'Book Tracker', template: '%s · Book Tracker' },
+  title: { default: 'Avuneri', template: '%s · Avuneri' },
   description:
-    'A private library and reading companion: your books, your reading, your notes and your loans.',
-  applicationName: 'Book Tracker',
+    'Avuneri is a private library and reading companion: your books, your reading, your notes and your loans.',
+  applicationName: 'Avuneri',
   // A private app: keep every page out of search engines.
   robots: { index: false, follow: false },
 };
@@ -24,7 +25,10 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Every page renders per request: the CSP nonce is per request, and private pages must never be
+  // prerendered or cached.
+  await connection();
   return (
     <html lang="en">
       <body>

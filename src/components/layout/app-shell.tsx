@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { SignedInProfile } from '@/lib/auth/session-api';
 import { PrimaryNavigation } from './primary-navigation';
 import { SiteHeader } from './site-header';
 
@@ -7,10 +8,10 @@ import { SiteHeader } from './site-header';
  * column reserves space for the fixed bottom bar and the device safe area, so the last line of
  * content is never hidden behind the navigation.
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ profile, children }: { profile: SignedInProfile; children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
-      <SiteHeader />
+      <SiteHeader profile={profile} />
       <div className="flex flex-1 md:items-start">
         <PrimaryNavigation />
         <main

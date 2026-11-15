@@ -1,140 +1,128 @@
-# Book Tracker — frontend
+# Avuneri — web app
 
-The mobile-first web app for Book Tracker, a private personal library and reading companion. The
-REST API lives in [`book-tracker-backend`](https://github.com/chineduknight/book-tracker-backend).
+The mobile-first web app for **Avuneri**, a private personal library and reading companion
+(repository name: `book-tracker-frontend`). The REST API lives in
+[`book-tracker-backend`](https://github.com/chineduknight/book-tracker-backend).
 
-This is the **foundation** (roadmap milestone FE #15): the app shell, navigation, design system and
-a typed API transport. It has **no sign-in, no live data and no backend calls yet**. Every page is
-an honest placeholder for the milestone that fills it.
+What exists so far:
+
+- the signed-in app shell, navigation and design system (FE #15);
+- registration, sign-in, logout and an account menu, with browser sessions handled by a server-side
+  Backend-for-Frontend (FE #16).
+
+The library features themselves (books, reading, notes, lending) are placeholders until FE #17–#19.
 
 ## Requirements
 
 - Node **26.x** (`.nvmrc`; `engine-strict` rejects other versions) and npm 11.
-- No environment variables are needed to develop, build or test FE #15.
+- A local **MongoDB 8** for web sessions (Docker is easiest).
+- The Book Tracker API running locally (port 3000 by default), for signing in.
 
 ## Getting started
 
 ```bash
 nvm use
 npm ci
-npm run dev        # http://localhost:3100
+docker run -d --rm --name avuneri-bff-mongo -p 127.0.0.1:27018:27017 mongo:8.0
+cp .env.example .env.local      # then generate BFF_SESSION_ENCRYPTION_KEY as described inside
+npm run dev                     # http://localhost:3100
 ```
 
-The app uses port **3100** so it can run beside the API, which defaults to port 3000.
+The app uses port **3100** so it can run beside the API on 3000. In development, the session
+store's indexes are created automatically on first use.
+
+## Configuration
+
+All variables are **server-only**; never give any of them a `NEXT_PUBLIC_` prefix. Missing or
+invalid values fail closed. See [`.env.example`](.env.example).
+
+| Variable                     | Purpose                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| `APP_ORIGIN`                 | Exact origin readers use; the only origin allowed to sign in, register or log out |
+| `API_BASE_URL`               | The API, including `/api/v1`                                                      |
+| `BFF_SESSION_MONGODB_URI`    | Dedicated MongoDB database for web sessions (never the API's database)            |
+| `BFF_SESSION_ENCRYPTION_KEY` | 32 random bytes, base64url: encrypts stored API tokens, keys session verifiers    |
+
+Building needs none of them; they are read at request time.
 
 ## Scripts
 
-| Script                       | What it does                                                                       |
-| ---------------------------- | ---------------------------------------------------------------------------------- |
-| `npm run dev`                | Development server on port 3100                                                    |
-| `npm run build`              | Production build                                                                   |
-| `npm run start`              | Serves the production build on port 3100                                           |
-| `npm run typecheck`          | Generates Next.js route types, then runs `tsc` (strict)                            |
-| `npm run lint`               | ESLint (Next.js core-web-vitals + TypeScript rules), zero warnings allowed         |
-| `npm run format:check`       | Prettier check (`npm run format` to fix)                                           |
-| `npm test`                   | Vitest unit and component tests                                                    |
-| `npm run test:e2e`           | Playwright on mobile (Pixel 7) and desktop Chromium; builds first when run locally |
-| `npm run test:accessibility` | Only the axe accessibility, theme and reduced-motion checks                        |
-| `npm run check:bundle`       | Scans `.next/static` for server-only values (run after a build)                    |
-| `npm run test:ci`            | Everything CI runs, in order                                                       |
+| Script                                       | What it does                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------- |
+| `npm run dev` / `build` / `start`            | Development server, production build, production server (port 3100)       |
+| `npm run typecheck`                          | Generates Next.js route types, then runs `tsc` (strict)                   |
+| `npm run lint` / `format:check`              | ESLint (zero warnings) / Prettier                                         |
+| `npm test`                                   | Vitest unit and component tests                                           |
+| `npm run test:integration`                   | Session store tests against a real, local, disposable MongoDB             |
+| `npm run test:e2e`                           | Playwright on mobile and desktop Chromium (builds first when run locally) |
+| `npm run test:accessibility`                 | Only the axe, theme and reduced-motion checks                             |
+| `npm run check:bundle`                       | Scans `.next/static` for server-only values (run after a build)           |
+| `npm run check:contrast`                     | WCAG contrast of every design-token pair                                  |
+| `npm run session-store:indexes [-- --apply]` | Operator tool: verify (read-only) or create missing session indexes       |
+| `npm run test:ci`                            | Everything CI runs, in order                                              |
 
-First Playwright run: `npx playwright install chromium`. The walkthrough spec writes screenshots to
-`screenshots/` (git-ignored; CI uploads them as the `visual-walkthrough` artifact).
+First Playwright run: `npx playwright install chromium`. Integration and e2e tests expect MongoDB
+on `127.0.0.1:27018` (override with `BFF_SESSION_TEST_MONGODB_URI` / `E2E_SESSION_MONGODB_URI`;
+loopback only). E2E tests run against a local fake of the API's auth endpoints
+(`e2e/support/fake-auth-api.mjs`), never a real account. The walkthrough spec writes screenshots
+to `screenshots/` (git-ignored; CI uploads them as the `visual-walkthrough` artifact).
 
 ## Routes
 
-| Route                  | Primary tab | Purpose (milestone)                               |
-| ---------------------- | ----------- | ------------------------------------------------- |
-| `/`                    | Home        | Overview, recent activity, quick actions (FE #19) |
-| `/library`             | Library     | Catalogue, physical copies, locations (FE #17)    |
-| `/library/categories`  | Library     | Categories (FE #17)                               |
-| `/library/collections` | Library     | Collections (FE #17)                              |
-| `/library/wishlist`    | Library     | Wishlist (FE #17)                                 |
-| `/reading`             | Reading     | Current reads, sessions, progress (FE #18)        |
-| `/notes`               | Notes       | Notes, highlights, search (FE #18)                |
-| `/lending`             | Lending     | Active, overdue and returned loans (FE #19)       |
+| Route                                                     | Access     | Purpose                                                    |
+| --------------------------------------------------------- | ---------- | ---------------------------------------------------------- |
+| `/login`, `/register`                                     | Signed out | Sign in, create an account (signed-in readers go home)     |
+| `/`                                                       | Signed in  | Home (FE #19 adds the overview)                            |
+| `/library` (+ `/categories`, `/collections`, `/wishlist`) | Signed in  | Library placeholders (FE #17)                              |
+| `/reading`, `/notes`                                      | Signed in  | Placeholders (FE #18)                                      |
+| `/lending`                                                | Signed in  | Placeholder (FE #19)                                       |
+| `POST /api/session/register`, `/login`, `/logout`         | BFF        | Same-origin JSON only; return a safe profile, never tokens |
+| `GET /api/session/me`                                     | BFF        | The signed-in reader's name and email                      |
 
-The five tabs are defined once in [`src/config/navigation.ts`](src/config/navigation.ts).
-Categories, Collections and Wishlist are Library subsections, and Library stays the active tab on
-them. Account settings will sit in the header's reserved slot rather than becoming a sixth tab.
+A signed-out visit to a private page redirects to `/login?next=<page>`; only known application paths
+are accepted as `next`. The five tabs are defined once in
+[`src/config/navigation.ts`](src/config/navigation.ts).
+
+## How sign-in works (short version)
+
+The browser holds one opaque, HttpOnly session cookie and talks only to this app. The app keeps the
+API's access and refresh tokens server-side, AES-256-GCM encrypted in MongoDB, and calls the API with
+`Authorization: Bearer`. Because the API's refresh tokens are single-use, exactly one request per
+session (on any instance) may refresh, coordinated by an atomic claim in MongoDB. An uncertain
+refresh ends the session instead of risking a replay. Full design, threat model, failure modes and
+production prerequisites: [docs/auth-session-architecture.md](docs/auth-session-architecture.md).
 
 ## Project structure
 
 ```text
 src/
+  proxy.ts               CSP nonce + request path for server components (no authentication)
   app/
-    layout.tsx           html/body, metadata, viewport, skip link
-    not-found.tsx        404 inside the app shell
-    (app)/               every page that uses the app shell
-      layout.tsx         AppShell
-      error.tsx          route error boundary (never shows error details)
-      page.tsx, library/, reading/, notes/, lending/
-    globals.css          design tokens (light + dark) and base styles
-  components/
-    layout/              AppShell, SiteHeader, PrimaryNavigation, LibrarySectionPage
-    ui/                  Button/ButtonLink, Badge, Card/LinkCard, PageHeader, SectionHeader,
-                         EmptyState, InlineError, Skeleton, Input
+    (auth)/              /login, /register (public frame)
+    (app)/               signed-in pages; every page calls requireSignedInProfile()
+    api/session/         BFF route handlers
+    error.tsx, not-found.tsx, layout.tsx, globals.css
+  components/            auth forms, layout (shell, header, account menu), ui primitives, brand
   config/navigation.ts   the five destinations and the Library subsections
-  lib/api/               typed API transport (see below)
-  lib/utils.ts           cn(): clsx + tailwind-merge
-  test/                  Vitest setup and fixtures
-e2e/                     Playwright specs
-scripts/                 bundle and colour-contrast checks
-docs/decisions.md        design and architecture decisions
+  lib/                   client-safe code: API transport, credential rules, safe redirects, CSP
+  server/                server-only: config, auth adapter, sessions, HTTP handlers, logging
+  test/                  fixtures (fake API auth, in-memory store) and integration helpers
+e2e/                     Playwright specs and the fake auth API
+scripts/                 bundle, contrast and session-index tools
+docs/                    decisions and the auth/session architecture
 ```
 
 ## Design
 
 A quiet, modern reading room: warm paper canvas, dark ink text, one deep green accent, serif
-headings and a system sans body. There are no remote fonts, no images beyond icons and no
-analytics. Every colour is a token in [`globals.css`](src/app/globals.css) with a light and a dark
-value. The theme follows the operating system preference, with no toggle and so no theme flash.
-`node scripts/check-contrast.mjs` verifies WCAG AA contrast for each token pair.
-
-Layout: a fixed bottom bar with five labelled icons on phones, and a persistent left sidebar from
-768px. Both are the same `<nav>` restyled, so there is always exactly one set of links and one
-`aria-current="page"`. See [docs/decisions.md](docs/decisions.md) for the reasoning.
-
-## Backend integration
-
-`src/lib/api` is ready for later milestones but **is not called by any page yet**.
-
-- `createApiClient({ baseUrl, fetchImpl?, getAccessToken?, timeoutMs? })` with `get`, `getPage`,
-  `post`, `put`, `patch`, `delete` and `request`.
-- Paths are built with the `apiPath` template tag (`` apiPath`/books/${id}` ``). Each value is
-  URI-encoded as exactly one segment, and the first segment must be a known API resource.
-- It decodes the documented `{ data }`, paginated `{ data, meta.pagination }`, `204` and
-  `{ error: { code, message, requestId, details } }` envelopes into results or typed errors:
-  `ApiError` (HTTP), `ApiNetworkError`, `ApiAbortError` (cancelled/timeout) and `ApiProtocolError`.
-  Error messages never include bodies, URLs or tokens.
-- Requests use `cache: 'no-store'`, `credentials: 'omit'` and `redirect: 'error'`, with a 15s default
-  timeout. A download such as an export can pass `timeoutMs: false`.
-
-Assumptions taken from the backend's `docs/api-contract.md`: the base path is `/api/v1`, auth is
-bearer tokens in JSON (not cookies), CORS is `credentials: false`, and private responses are
-`no-store`.
-
-**Not wired yet, on purpose:** sign-in, token storage and refresh, protected routes and every
-data endpoint. How the browser holds a session (likely a Next.js server-side BFF with HttpOnly
-cookies) is the FE #16 decision; see [docs/decisions.md](docs/decisions.md#authentication-is-deferred-to-fe-16).
-
-### Environment
-
-| Variable       | Where       | Purpose                                                             |
-| -------------- | ----------- | ------------------------------------------------------------------- |
-| `API_BASE_URL` | Server only | API base including `/api/v1`. Unused in FE #15; see `.env.example`. |
-
-Never expose API configuration through a `NEXT_PUBLIC_` variable. CI builds with a sentinel
-`API_BASE_URL`, and `npm run check:bundle` fails if it (or any token, `/api/v1` or a `NEXT_PUBLIC_`
-name) reaches the browser bundle.
+headings and a system sans body. There are no remote fonts, no images beyond icons and no analytics.
+Every colour is a token in [`globals.css`](src/app/globals.css) with light and dark values that
+follow the system preference. On phones a fixed bottom bar holds the five labelled tabs; from 768px
+a sidebar does. See [docs/decisions.md](docs/decisions.md).
 
 ## Quality gates
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on pull requests and `main`:
-`npm ci` → typecheck → lint → format check → unit tests → build → bundle check → Playwright (mobile
-and desktop Chromium) → `npm audit --omit=dev --audit-level=high`.
-
-The Playwright suites cover routes and headings, navigation state, the keyboard (skip link, focus
-ring, no traps), layouts at 320, 390, 768, 1024 and 1440px, doubled text size, axe WCAG 2.2 AA checks
-in light and dark, reduced motion, security headers, and the absence of any cross-origin or API
-request.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on pull requests and `main` with a
+MongoDB 8 service: `npm ci` → typecheck → lint → format → unit tests → session integration tests →
+contrast → build (sentinel configuration) → bundle check → Playwright → production dependency audit.
+A separate job runs a full-history gitleaks secret scan. There is no deployment step.

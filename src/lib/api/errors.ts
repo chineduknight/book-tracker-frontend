@@ -15,6 +15,8 @@ export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly requestId: string | undefined;
   readonly details: readonly ApiErrorDetail[];
+  /** From `Retry-After` on 429 and 503 responses, in whole seconds. */
+  readonly retryAfterSeconds: number | undefined;
 
   constructor(init: {
     status: number;
@@ -22,12 +24,14 @@ export class ApiError extends Error {
     message: string;
     requestId?: string | undefined;
     details?: readonly ApiErrorDetail[] | undefined;
+    retryAfterSeconds?: number | undefined;
   }) {
     super(init.message);
     this.status = init.status;
     this.code = init.code;
     this.requestId = init.requestId;
     this.details = init.details ?? [];
+    this.retryAfterSeconds = init.retryAfterSeconds;
   }
 }
 
