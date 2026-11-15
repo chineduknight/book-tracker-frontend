@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { LibrarySectionPage } from '@/components/layout/library-section-page';
+import { GroupListPage } from '@/components/library/group-pages';
 import { requireSignedInProfile } from '@/server/current-session';
 
 export const metadata: Metadata = { title: 'Categories' };
 
-export default async function CategoriesPage() {
+export default async function Page({ searchParams }: PageProps<'/library/categories'>) {
   await requireSignedInProfile();
-  return <LibrarySectionPage href="/library/categories" emptyTitle="No categories yet" />;
+  return <GroupListPage kind="categories" searchParams={await searchParams} />;
 }

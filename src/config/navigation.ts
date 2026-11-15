@@ -5,6 +5,7 @@ import {
   House,
   Layers,
   LibraryBig,
+  MapPin,
   NotebookPen,
   Repeat,
   Tags,
@@ -66,19 +67,25 @@ export const librarySections = [
     href: '/library/categories',
     label: 'Categories',
     icon: Tags,
-    summary: 'Group books by subject using the default categories or ones you create.',
+    summary: 'Group books by subject, starting from suggested names or your own.',
   },
   {
     href: '/library/collections',
     label: 'Collections',
     icon: Layers,
-    summary: 'Hand-picked lists such as “Books for 2027”, in the order you choose.',
+    summary: 'Your own lists, such as “Books for 2027”, kept in the order you add books.',
   },
   {
     href: '/library/wishlist',
     label: 'Wishlist',
     icon: Heart,
     summary: 'Books you would like to own, kept apart from the books you already have.',
+  },
+  {
+    href: '/library/locations',
+    label: 'Locations',
+    icon: MapPin,
+    summary: 'Where your physical copies live, such as Home, Office or Study Shelf.',
   },
 ] as const satisfies readonly Destination[];
 
@@ -95,4 +102,10 @@ export function findDestination(href: PrimaryHref): Destination {
   const destination = primaryNavigation.find((item) => item.href === href);
   if (!destination) throw new Error(`Unknown primary destination: ${href}`);
   return destination;
+}
+
+export function findLibrarySection(href: (typeof librarySections)[number]['href']): Destination {
+  const section = librarySections.find((item) => item.href === href);
+  if (!section) throw new Error(`Unknown library section: ${href}`);
+  return section;
 }

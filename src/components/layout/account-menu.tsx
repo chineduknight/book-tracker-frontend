@@ -55,7 +55,8 @@ export function AccountMenu({ name, email }: SignedInProfile) {
       {},
     );
     if (result.ok) {
-      const confirmed = result.data.backendSignOut !== 'unconfirmed';
+      const confirmed =
+        result.data?.backendSignOut === 'confirmed' || result.data?.backendSignOut === 'not-needed';
       replaceWith(confirmed ? '/login?signedOut=1' : '/login?signedOut=unconfirmed');
       return;
     }
