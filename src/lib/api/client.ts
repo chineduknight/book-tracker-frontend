@@ -187,6 +187,7 @@ export function createApiClient(options: ApiClientOptions) {
         message,
         requestId: envelope.error.requestId ?? requestId,
         details,
+        retryAfterSeconds: parseRetryAfter(response.headers.get('retry-after'), Date.now()),
       });
     }
 
@@ -252,4 +253,17 @@ function isJsonContentType(header: string | null): boolean {
   if (!header) return false;
   const mediaType = header.split(';')[0]?.trim().toLowerCase() ?? '';
   return mediaType === 'application/json' || /^application\/[a-z0-9.+-]+\+json$/.test(mediaType);
+}
+
+const MAX_RETRY_AFTER_SECONDS = 24 * 60 * 60;
+
+/** Reads `Retry-After` as delay-seconds or an HTTP date; anything else is ignored. */
+export function parseRetryAfter(header: string | null, nowMs: number): number | undefined {
+  if (!header) return undefined;
+  const value = header.trim();
+  const seconds = /^\d+$/.test(value)
+    ? Number(value)
+    : Math.ceil((Date.parse(value) - nowMs) / 1000);
+  if (!Number.isFinite(seconds)) return undefined;
+  return Math.min(Math.max(seconds, 0), MAX_RETRY_AFTER_SECONDS);
 }

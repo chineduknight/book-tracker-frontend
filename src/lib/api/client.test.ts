@@ -8,7 +8,7 @@ import {
   REQUEST_ID,
   TEST_BASE_URL,
 } from '@/test/fixtures/fetch';
-import { createApiClient } from './client';
+import { createApiClient, parseRetryAfter } from './client';
 import {
   ApiAbortError,
   ApiConfigError,
@@ -351,5 +351,37 @@ describe('cancellation and timeouts', () => {
     controller.abort();
 
     await expect(promise).rejects.toMatchObject({ reason: 'cancelled' });
+  });
+});
+
+describe('Retry-After', () => {
+  it('is exposed on rate-limited errors', async () => {
+    const { fetchImpl } = fakeFetch(
+      jsonResponse(
+        429,
+        {
+          error: {
+            code: 'RATE_LIMITED',
+            message: 'Too many requests, try again later',
+            requestId: REQUEST_ID,
+          },
+        },
+        { 'Retry-After': '120' },
+      ),
+    );
+    const error = await captureError(
+      clientWith(fetchImpl).post(apiPath`/auth/login`, { body: {} }),
+    );
+    expect(error).toMatchObject({ status: 429, code: 'RATE_LIMITED', retryAfterSeconds: 120 });
+  });
+
+  it.each([
+    ['delay seconds', '30', 30],
+    ['an HTTP date', new Date(Date.UTC(2026, 10, 15, 12, 1, 0)).toUTCString(), 60],
+    ['a date in the past', new Date(Date.UTC(2026, 10, 15, 11, 0, 0)).toUTCString(), 0],
+    ['garbage', 'soon', undefined],
+    ['an absurd delay', '99999999', 86_400],
+  ])('parses %s', (_name, header, expected) => {
+    expect(parseRetryAfter(header, Date.UTC(2026, 10, 15, 12, 0, 0))).toBe(expected);
   });
 });
