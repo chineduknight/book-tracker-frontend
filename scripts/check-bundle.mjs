@@ -1,8 +1,10 @@
-// Scans the production browser bundle for things that must never reach a browser: the server-only
-// API configuration, NEXT_PUBLIC_ variables, bearer tokens and backend URLs.
+// Scans the production browser bundle for things that must never reach a browser: server-only
+// configuration, NEXT_PUBLIC_ variables, bearer tokens, backend URLs and the BFF's session code.
 //
-// Usage: build with a sentinel API_BASE_URL, then run this script:
-//   API_BASE_URL=https://bundle-sentinel.invalid/api/v1 npm run build && npm run check:bundle
+// Usage: build with sentinel server configuration (as CI does), then run this script:
+//   API_BASE_URL=https://bundle-sentinel.invalid/api/v1 \
+//   BFF_SESSION_MONGODB_URI=mongodb://bundle-sentinel.invalid/avuneri-bff ... npm run build
+//   npm run check:bundle
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -25,6 +27,11 @@ const forbidden = [
   ['an Authorization header', /Authorization/],
   ['a JWT', /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}/],
   ['a MongoDB URI', /mongodb(\+srv)?:\/\//],
+  ['a BFF session variable name', /BFF_SESSION_|APP_ORIGIN/],
+  ['the session collection (server session code)', /avuneri_bff_sessions/],
+  ['session token encryption (server session code)', /aes-256-gcm|token-encryption/],
+  ['the session cookie name (cookies are HttpOnly and server-managed)', /avuneri_session/],
+  ['a refresh token field', /refreshToken/],
 ];
 
 let scanned = 0;
