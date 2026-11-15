@@ -131,16 +131,33 @@ export function createSessionService({
     }
   }
 
-  async function currentUser(sessionSecret: string): Promise<BackendUser> {
+  /**
+   * The single way to call the API as the signed-in reader. A 401 from the API means the backend
+   * session is gone, so the local session ends too; every other API error is left to the caller.
+   */
+  async function callAsReader<T>(
+    sessionSecret: string,
+    call: (accessToken: string) => Promise<T>,
+  ): Promise<T> {
     const { accessToken, sessionId } = await accessTokenFor(sessionSecret);
     try {
-      return await backend.currentUser(accessToken);
+      return await call(accessToken);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         await storeOperation(() => store.deleteById(sessionId));
         logEvent('info', 'session.revoked_by_backend', { requestId: error.requestId });
         throw new SessionEndedError('revoked-by-backend');
       }
+      throw error;
+    }
+  }
+
+  async function currentUser(sessionSecret: string): Promise<BackendUser> {
+    try {
+      return await callAsReader(sessionSecret, (accessToken) => backend.currentUser(accessToken));
+    } catch (error) {
+      if (error instanceof SessionEndedError || error instanceof SessionUnavailableError)
+        throw error;
       throw backendUnavailable(error);
     }
   }
@@ -298,7 +315,7 @@ export function createSessionService({
     }
   }
 
-  return { startSession, accessTokenFor, currentUser, endSession };
+  return { startSession, accessTokenFor, callAsReader, currentUser, endSession };
 }
 
 export type SessionService = ReturnType<typeof createSessionService>;
