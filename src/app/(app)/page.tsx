@@ -3,24 +3,28 @@ import { Card, LinkCard } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { primaryNavigation } from '@/config/navigation';
+import { requireSignedInProfile } from '@/server/current-session';
 
 export const metadata: Metadata = { title: 'Home' };
 
 const destinations = primaryNavigation.filter((item) => item.href !== '/');
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { name } = await requireSignedInProfile();
   return (
     <>
       <PageHeader
         title="Welcome to your library"
-        description="Book Tracker is a private place for the books you own, what you are reading, what you take from each book and who has borrowed which copy."
+        description="Avuneri is a private place for the books you own, what you are reading, what you take from each book and who has borrowed which copy."
       />
 
       <Card className="mb-10">
-        <h2 className="font-serif text-lg font-semibold text-ink">An early preview</h2>
+        <h2 className="font-serif text-lg font-semibold break-words text-ink">
+          You’re signed in, {name}
+        </h2>
         <p className="mt-1 max-w-prose text-sm text-ink-muted">
-          The layout and navigation are ready. Signing in, your books and your reading history come
-          in the next milestones, so there is nothing personal here yet and nothing is being saved.
+          Your account is ready. Adding books, tracking your reading and lending arrive in the next
+          milestones; until then there is nothing else stored here.
         </p>
       </Card>
 
