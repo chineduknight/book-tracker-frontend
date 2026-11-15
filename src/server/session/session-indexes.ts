@@ -1,4 +1,5 @@
 import type { Collection, Document, IndexDescription } from 'mongodb';
+import { logEvent } from '../log';
 
 export const SESSION_COLLECTION = 'avuneri_bff_sessions';
 
@@ -45,10 +46,30 @@ export async function inspectSessionIndexes<T extends Document>(
       JSON.stringify(actual.key) === JSON.stringify(required.key) &&
       Boolean(actual.unique) === ('unique' in required && required.unique) &&
       actual.expireAfterSeconds ===
-        ('expireAfterSeconds' in required ? required.expireAfterSeconds : undefined);
+        ('expireAfterSeconds' in required ? required.expireAfterSeconds : undefined) &&
+      hasOnlyExpectedOptions(actual);
     if (!matches) report.conflicting.push(required.name);
   }
   return report;
+}
+
+/**
+ * Fields MongoDB reports for an index like ours. Anything else (a partial filter, `sparse`,
+ * `hidden`, a collation...) changes which records the index covers or how it compares them, so
+ * a same-named index carrying it does not enforce the guarantee we rely on.
+ */
+const NEUTRAL_INDEX_FIELDS = new Set([
+  'v',
+  'key',
+  'name',
+  'unique',
+  'expireAfterSeconds',
+  'ns',
+  'background',
+]);
+
+function hasOnlyExpectedOptions(index: Document): boolean {
+  return Object.keys(index).every((field) => NEUTRAL_INDEX_FIELDS.has(field));
 }
 
 export class SessionIndexConflictError extends Error {
@@ -71,4 +92,71 @@ export async function createMissingSessionIndexes<T extends Document>(
   const toCreate = SESSION_INDEXES.filter((index) => report.missing.includes(index.name));
   if (toCreate.length > 0) await collection.createIndexes([...toCreate]);
   return toCreate.map((index) => index.name);
+}
+
+export class SessionStoreNotReadyError extends Error {
+  override readonly name = 'SessionStoreNotReadyError';
+}
+
+export interface IndexReadinessOptions {
+  /** Development creates missing indexes itself; elsewhere only the operator tool may. */
+  isDevelopment: boolean;
+  now?: () => number;
+  /** A verified state is trusted only this long, so a later index change is noticed. */
+  recheckAfterSuccessMs?: number;
+  recheckAfterFailureMs?: number;
+}
+
+/**
+ * Gates every session-store operation on the indexes matching {@link SESSION_INDEXES}. Serving
+ * traffic never changes indexes outside development, and while they do not verify, every
+ * operation fails closed. Concurrent requests share one check.
+ */
+export function createIndexReadinessGate<T extends Document>(
+  collection: Collection<T>,
+  {
+    isDevelopment,
+    now = Date.now,
+    recheckAfterSuccessMs = 60_000,
+    recheckAfterFailureMs = 30_000,
+  }: IndexReadinessOptions,
+): () => Promise<void> {
+  let check: Promise<void> | undefined;
+  let isChecking = false;
+  let lastSucceeded = false;
+  let settledAt = 0;
+
+  async function verify(): Promise<void> {
+    if (isDevelopment) {
+      await createMissingSessionIndexes(collection);
+      return;
+    }
+    const report = await inspectSessionIndexes(collection);
+    if (report.missing.length > 0 || report.conflicting.length > 0) {
+      logEvent('error', 'session.store_indexes_not_ready', {
+        reason: [...report.missing, ...report.conflicting].join(','),
+      });
+      throw new SessionStoreNotReadyError('Session store indexes are not ready');
+    }
+  }
+
+  async function runCheck(): Promise<void> {
+    isChecking = true;
+    try {
+      await verify();
+      lastSucceeded = true;
+    } catch (error) {
+      lastSucceeded = false;
+      throw error;
+    } finally {
+      isChecking = false;
+      settledAt = now();
+    }
+  }
+
+  return async () => {
+    const maxAge = lastSucceeded ? recheckAfterSuccessMs : recheckAfterFailureMs;
+    if (!check || (!isChecking && now() - settledAt > maxAge)) check = runCheck();
+    await check;
+  };
 }

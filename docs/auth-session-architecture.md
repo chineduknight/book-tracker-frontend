@@ -97,7 +97,12 @@ Properties, each tested against a real MongoDB (`session-service.integration.tes
    whether or not the token was consumed, because reuse detection covers logout too.
 4. **Abandoned claims.** A claim older than its lease (20 s) means the holder crashed or stalled.
    The next request deletes the session (conditioned on that claim) and requires sign-in. It never
-   refreshes. The lease exceeds the API call timeout (8 s) plus bounded store operations (3–4 s).
+   refreshes. **Latency budget:** the holder's path is one API refresh (bounded at 8 s) and one store
+   write. A store operation is bounded per stage (server selection 3 s, connection 3 s, pool wait
+   2 s, socket 4 s). With the driver's single automatic retry, the worst case can exceed the lease.
+   That is safe: if the lease expires first, a waiter deletes the session, the holder's fenced write
+   matches nothing, and the holder revokes the new tokens. Either way the session ends and nothing
+   is resurrected. A test makes the holder's write outlast the lease and checks this.
 5. **429 is the only retryable failure.** The API rate-limits before reading the body, so a 429
    proves the token unused. The claim is released and the reader is asked to retry.
 6. **Absolute expiry is preserved.** Lifetimes count from when the request was sent. The stored
@@ -129,12 +134,12 @@ are never derived from the access token.
 
 ## 6. Keys and secrets
 
-| Variable                     | Contents                           | Rules                                                                                                        |
-| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `BFF_SESSION_ENCRYPTION_KEY` | 32 random bytes, base64url         | Exactly 32 bytes, at least 16 distinct. HKDF derives independent token-encryption and verifier keys from it. |
-| `BFF_SESSION_MONGODB_URI`    | URI with a dedicated database name | Not `admin`, `local`, `config` or `test`. Not loopback behind an https `APP_ORIGIN`.                         |
-| `APP_ORIGIN`                 | Exact public origin                | https, or loopback http for local use.                                                                       |
-| `API_BASE_URL`               | API base including `/api/v1`       | https. Not loopback behind an https `APP_ORIGIN`.                                                            |
+| Variable                     | Contents                           | Rules                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BFF_SESSION_ENCRYPTION_KEY` | 32 random bytes, base64url         | Exactly 32 bytes, at least 16 distinct. HKDF derives independent token-encryption and verifier keys from it.                                                                                                                                                                                                                                                                                                                 |
+| `BFF_SESSION_MONGODB_URI`    | URI with a dedicated database name | Not `admin`, `local`, `config` or `test`. Not loopback behind an https `APP_ORIGIN`. **Any non-loopback server requires TLS**: `mongodb+srv://` (TLS by default) or `mongodb://…?tls=true`. `tls=false`/`ssl=false`, `tlsInsecure`, `tlsAllowInvalidCertificates` and `tlsAllowInvalidHostnames` are refused, and the client also forces `tls: true` for remote servers. Plaintext only for a loopback development database. |
+| `APP_ORIGIN`                 | Exact public origin                | https, or loopback http for local use.                                                                                                                                                                                                                                                                                                                                                                                       |
+| `API_BASE_URL`               | API base including `/api/v1`       | https. Not loopback behind an https `APP_ORIGIN`.                                                                                                                                                                                                                                                                                                                                                                            |
 
 Validation errors name the variable and rule, never the value.
 
@@ -150,19 +155,20 @@ piped straight into the secret store.
 
 ## 7. Failure modes
 
-| Failure                               | Reader sees                                                                     | Session                                        |
-| ------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------- |
-| API unreachable during sign-in        | "Avuneri can't be reached right now" (never "wrong password")                   | None created                                   |
-| API 429 during sign-in                | "Too many attempts. Wait about N minutes" (from `Retry-After`)                  | None created                                   |
-| Session store down during sign-in     | Service unavailable                                                             | The just-issued API session is logged out      |
-| Store down while browsing             | Error page ("Avuneri is unavailable"); no private content                       | Unchanged                                      |
-| API down while a refresh is due       | Signed out at the next request (conservative: the token may have been consumed) | Deleted; API logout attempted                  |
-| API down on a page with a fresh token | Error page                                                                      | Unchanged                                      |
-| Instance crashes mid-refresh          | Signed out at the next request after the 20 s lease                             | Deleted; API logout with the old token         |
-| Store unreachable at logout           | "Signed out on this device; the server session will expire on its own"          | Cookie removed; record expires by TTL          |
-| API unreachable at logout             | Same honest notice                                                              | Record deleted; API session ends at its expiry |
-| Indexes missing in production         | Sign-in and private pages fail closed until the operator applies them           | n/a                                            |
-| Invalid configuration                 | 503 on the session API, error page on pages                                     | n/a                                            |
+| Failure                                           | Reader sees                                                                                   | Session                                        |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| API unreachable during sign-in                    | "Avuneri can't be reached right now" (never "wrong password")                                 | None created                                   |
+| API 429 during sign-in                            | "Too many attempts. Wait about N minutes" (from `Retry-After`)                                | None created                                   |
+| Session store down during sign-in                 | Service unavailable                                                                           | The just-issued API session is logged out      |
+| Store down while browsing                         | Error page ("Avuneri is unavailable"); no private content                                     | Unchanged                                      |
+| API down while a refresh is due                   | Signed out at the next request (conservative: the token may have been consumed)               | Deleted; API logout attempted                  |
+| API down on a page with a fresh token             | Error page                                                                                    | Unchanged                                      |
+| Instance crashes mid-refresh                      | Signed out at the next request after the 20 s lease                                           | Deleted; API logout with the old token         |
+| Store unreachable at logout                       | "Signed out on this device; the server session will expire on its own"                        | Cookie removed; record expires by TTL          |
+| API unreachable at logout                         | Same honest notice                                                                            | Record deleted; API session ends at its expiry |
+| Indexes missing, changed or dropped in production | Sign-in and private pages fail closed (within 60 s of a change) until the operator fixes them | n/a                                            |
+| Remote session store configured without TLS       | Configuration error: no session is served                                                     | n/a                                            |
+| Invalid configuration                             | 503 on the session API, error page on pages                                                   | n/a                                            |
 
 ## 8. Local development
 
@@ -188,7 +194,11 @@ None of these is provisioned or approved by this change.
 2. **Session database.** A dedicated database (for example `avuneri-bff`) and its own database
    user, with `readWrite` on that database only. Do not reuse the API's credentials. Indexes are
    created by the operator before traffic (`npm run session-store:indexes -- --apply` with an
-   index-capable user), then verified read-only (`npm run session-store:indexes`). On Atlas M0
+   index-capable user), then verified read-only (`npm run session-store:indexes`). Verification
+   requires the exact shape: key, uniqueness, TTL and **no other options**, so a partial, sparse,
+   hidden or collated index with the right name is a conflict. Each instance re-verifies at most
+   every 60 s after a success (30 s after a failure), so a later index change makes it fail closed
+   instead of going unnoticed. The connection must use TLS (section 6). On Atlas M0
    (one free cluster per project) the session database could share the API's cluster under a
    separate user. That choice, and any cost, is the owner's.
 3. **API rate limits now see one client.** The API limits authentication per client address. With

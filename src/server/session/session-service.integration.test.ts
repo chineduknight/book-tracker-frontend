@@ -287,6 +287,31 @@ describe('refresh rotation', () => {
     expect(await rawSessions().countDocuments()).toBe(0);
   });
 
+  it('fails closed when a slow claim holder overruns its lease', async () => {
+    const slow = await startInstance((store) => ({
+      ...store,
+      completeRefresh: async (...args) => {
+        await new Promise((resolve) => setTimeout(resolve, TIMING.refreshLeaseMs + 500));
+        return store.completeRefresh(...args);
+      },
+    }));
+    const other = await startInstance();
+    const { sessionSecret, signedIn } = await signedInSession(slow);
+    makeAccessTokenStale();
+
+    const holder = slow.sessions.accessTokenFor(sessionSecret).catch((error: unknown) => error);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const waiter = other.sessions.accessTokenFor(sessionSecret).catch((error: unknown) => error);
+    const [holderOutcome, waiterOutcome] = await Promise.all([holder, waiter]);
+
+    expect(holderOutcome).toBeInstanceOf(SessionEndedError);
+    expect(waiterOutcome).toBeInstanceOf(SessionEndedError);
+    expect(fake.stats.refreshCalls).toBe(1);
+    expect(await rawSessions().countDocuments()).toBe(0);
+    // Both the rotated tokens and the original session are revoked at the API.
+    expect(fake.isSessionLiveFor(signedIn.tokens.refreshToken)).toBe(false);
+  });
+
   it('treats a claim abandoned by a crashed instance as compromised, without refreshing', async () => {
     const [crashed, survivor] = [await startInstance(), await startInstance()];
     const { sessionSecret, signedIn } = await signedInSession(crashed);

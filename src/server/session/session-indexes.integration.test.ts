@@ -1,13 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   openDisposableDatabase,
   type DisposableDatabase,
 } from '@/test/integration/disposable-database';
 import {
+  createIndexReadinessGate,
   createMissingSessionIndexes,
   inspectSessionIndexes,
   SESSION_COLLECTION,
   SessionIndexConflictError,
+  SessionStoreNotReadyError,
 } from './session-indexes';
 
 let database: DisposableDatabase;
@@ -93,6 +95,92 @@ describe('session store indexes', () => {
     );
     await expect(inspectSessionIndexes(sessions())).resolves.toMatchObject({
       conflicting: ['sessionExpiresAt_ttl'],
+    });
+  });
+
+  it.each([
+    ['partial', { partialFilterExpression: { userId: { $exists: true } } }],
+    ['sparse', { sparse: true }],
+    ['hidden', { hidden: true }],
+    ['collated', { collation: { locale: 'en', strength: 2 } }],
+  ])(
+    'rejects a %s verifier index even with the expected name, key and uniqueness',
+    async (_name, options) => {
+      await sessions().createIndex(
+        { verifierDigest: 1 },
+        { name: 'verifierDigest_unique', unique: true, ...options },
+      );
+      await expect(inspectSessionIndexes(sessions())).resolves.toMatchObject({
+        conflicting: ['verifierDigest_unique'],
+      });
+      await expect(createMissingSessionIndexes(sessions())).rejects.toBeInstanceOf(
+        SessionIndexConflictError,
+      );
+    },
+  );
+
+  it('rejects a TTL index that is partial', async () => {
+    await sessions().createIndex(
+      { sessionExpiresAt: 1 },
+      {
+        name: 'sessionExpiresAt_ttl',
+        expireAfterSeconds: 0,
+        partialFilterExpression: { userId: { $exists: true } },
+      },
+    );
+    await expect(inspectSessionIndexes(sessions())).resolves.toMatchObject({
+      conflicting: ['sessionExpiresAt_ttl'],
+    });
+  });
+});
+
+describe('index readiness gate', () => {
+  function gateWithClock(isDevelopment = false) {
+    const clock = { ms: 1_000_000 };
+    const gate = createIndexReadinessGate(sessions(), {
+      isDevelopment,
+      now: () => clock.ms,
+      recheckAfterSuccessMs: 60_000,
+      recheckAfterFailureMs: 30_000,
+    });
+    return { gate, clock };
+  }
+
+  it('fails closed in production until the indexes exist', async () => {
+    const { gate, clock } = gateWithClock();
+    await expect(gate()).rejects.toBeInstanceOf(SessionStoreNotReadyError);
+    await createMissingSessionIndexes(sessions());
+    await expect(gate()).rejects.toBeInstanceOf(SessionStoreNotReadyError);
+    clock.ms += 30_001;
+    await expect(gate()).resolves.toBeUndefined();
+  });
+
+  it('notices an index dropped after a successful check, at the next recheck', async () => {
+    await createMissingSessionIndexes(sessions());
+    const { gate, clock } = gateWithClock();
+    await expect(gate()).resolves.toBeUndefined();
+
+    await sessions().dropIndex('verifierDigest_unique');
+    clock.ms += 59_000;
+    await expect(gate()).resolves.toBeUndefined();
+    clock.ms += 2_000;
+    await expect(gate()).rejects.toBeInstanceOf(SessionStoreNotReadyError);
+  });
+
+  it('shares one check between concurrent requests', async () => {
+    await createMissingSessionIndexes(sessions());
+    const { gate } = gateWithClock();
+    const listIndexes = vi.spyOn(sessions().constructor.prototype, 'listIndexes');
+    await Promise.all(Array.from({ length: 10 }, () => gate()));
+    expect(listIndexes).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates missing indexes itself in development', async () => {
+    const { gate } = gateWithClock(true);
+    await expect(gate()).resolves.toBeUndefined();
+    await expect(inspectSessionIndexes(sessions())).resolves.toEqual({
+      missing: [],
+      conflicting: [],
     });
   });
 });
