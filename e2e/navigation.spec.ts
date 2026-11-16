@@ -72,8 +72,8 @@ test.describe('navigating', () => {
   });
 
   test('the unfinished tabs hold no buttons; only the account menu does', async ({ page }) => {
-    // Reading, Notes and Lending have no actions yet; any button there would be a dead control.
-    for (const path of ['/', '/reading', '/notes', '/lending']) {
+    // Home and Lending have no actions yet; any button there would be a dead control.
+    for (const path of ['/', '/lending']) {
       await page.goto(path);
       await expect(page.getByRole('main').getByRole('button')).toHaveCount(0);
       await expect(page.getByRole('banner').getByRole('button')).toHaveCount(1);
@@ -124,7 +124,8 @@ test.describe('keyboard', () => {
   });
 
   test('focus can travel through the whole page and wrap around (no traps)', async ({ page }) => {
-    await page.goto('/notes');
+    // A view whose focusable elements don't depend on how many notes the account holds.
+    await page.goto('/notes?q=nothingmatchesthisword');
     const seen: string[] = [];
     for (let i = 0; i < 40; i++) {
       await page.keyboard.press('Tab');
@@ -137,6 +138,6 @@ test.describe('keyboard', () => {
     }
     expect(seen.at(-1)).toBe('Skip to content');
     for (const label of navLabels) expect(seen).toContain(label);
-    expect(seen).toContain('Go to Reading');
+    expect(seen).toContain('Clear filters');
   });
 });

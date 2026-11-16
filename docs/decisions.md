@@ -114,6 +114,26 @@ Recorded in detail in [library-contract.md](library-contract.md). The main decis
   `book-tracker-backend` pinned in CI, on disposable local databases. The fake auth API is kept
   only for session faults the real API cannot produce on demand.
 
+## Reading and notes (FE #18)
+
+Recorded in detail in [reading-notes-contract.md](reading-notes-contract.md). The main decisions:
+
+- **Same architecture, new allowlisted routes.** `/api/reading/*` and `/api/notes/*` reuse the
+  FE #17 pipeline; there is no second session mechanism. Note writes declare their own 100 kB body
+  cap (the API's limit). Library stays at 32 KiB and authentication at 8 KiB, each enforced on
+  streamed bytes.
+- **No Markdown renderer.** Note source and quotations are shown as literal text with an honest
+  label. Rendering untrusted Markdown safely needs a new dependency plus careful link, image and
+  HTML configuration, for a cosmetic gain; it can be revisited as a product decision.
+- **Explicit transitions only.** Finishing is a separate, confirmed action. Nothing auto-completes
+  at the last page or invents a date. `in_progress` is never sent on PATCH. Rereads are new readings.
+- **Degrade by section.** The book page loads reading and notes separately, so an outage there
+  shows a section error instead of hiding a healthy book.
+- **Calendar days as text.** Dates are never parsed into local `Date` objects for display.
+- **Unsaved-work warning without autosave.** Links and Cancel ask before discarding; nothing is
+  stored as a draft.
+- **No new dependencies.**
+
 ## API transport
 
 See the README's "Backend integration" section for the interface. Choices worth recording:

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { libraryApi, registerFreshReader, test, uniqueWord } from './support/reader';
+import { seedReadingAndNotes, type SeededReading } from './support/reading-notes';
 
 /**
  * Captures the visual walkthrough into screenshots/ (git-ignored; uploaded by CI as an artifact).
@@ -173,5 +174,97 @@ test.describe('visual walkthrough', () => {
     await page.goto(`/library/books/${ids.book}`);
     await page.getByRole('button', { name: 'Delete book' }).click();
     await page.screenshot({ path: 'screenshots/desktop-1440-delete-confirm.png' });
+  });
+});
+
+const readingShots = [
+  { name: 'rn-mobile-390-reading-history', width: 390, scheme: 'light', path: () => '/reading' },
+  {
+    name: 'rn-mobile-390-reading-active-dark',
+    width: 390,
+    scheme: 'dark',
+    path: (s: SeededReading) => `/reading/${s.activeSessionId}`,
+  },
+  {
+    name: 'rn-mobile-320-start-reading',
+    width: 320,
+    scheme: 'light',
+    path: (s: SeededReading) => `/reading/new?bookId=${s.bookId}`,
+  },
+  { name: 'rn-mobile-390-notes-dark', width: 390, scheme: 'dark', path: () => '/notes' },
+  {
+    name: 'rn-mobile-390-highlight',
+    width: 390,
+    scheme: 'light',
+    path: (s: SeededReading) => `/notes/${s.highlightId}`,
+  },
+  { name: 'rn-desktop-1440-reading-history', width: 1440, scheme: 'light', path: () => '/reading' },
+  {
+    name: 'rn-desktop-1440-reading-finished-dark',
+    width: 1440,
+    scheme: 'dark',
+    path: (s: SeededReading) => `/reading/${s.finishedSessionId}`,
+  },
+  {
+    name: 'rn-desktop-1440-book-reading-and-notes',
+    width: 1440,
+    scheme: 'light',
+    path: (s: SeededReading) => `/library/books/${s.bookId}`,
+  },
+  { name: 'rn-desktop-1440-notes', width: 1440, scheme: 'light', path: () => '/notes' },
+  {
+    name: 'rn-desktop-1440-note-markdown-dark',
+    width: 1440,
+    scheme: 'dark',
+    path: (s: SeededReading) => `/notes/${s.noteId}`,
+  },
+  {
+    name: 'rn-desktop-1440-new-highlight-for-reading',
+    width: 1440,
+    scheme: 'light',
+    path: (s: SeededReading) =>
+      `/notes/new?bookId=${s.bookId}&readingSessionId=${s.activeSessionId}`,
+  },
+] as const;
+
+test.describe('visual walkthrough: reading and notes', () => {
+  test.skip(({ isMobile }) => isMobile, 'captured once, from the desktop project');
+
+  test('reading and notes screens', async ({ page, baseURL }) => {
+    test.slow();
+    await registerFreshReader(page, baseURL!);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/reading');
+    await page.screenshot({
+      path: 'screenshots/rn-desktop-1440-reading-empty.png',
+      fullPage: true,
+    });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('/notes');
+    await page.screenshot({ path: 'screenshots/rn-desktop-1440-notes-empty-dark.png' });
+
+    const seeded = await seedReadingAndNotes(page, baseURL!);
+    for (const shot of readingShots) {
+      await page.setViewportSize({ width: shot.width, height: shot.width >= 768 ? 900 : 844 });
+      await page.emulateMedia({ colorScheme: shot.scheme });
+      await page.goto(shot.path(seeded));
+      await page.waitForLoadState('networkidle');
+      await page.screenshot({ path: `screenshots/${shot.name}.png`, fullPage: shot.width >= 768 });
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto(`/reading/${seeded.activeSessionId}`);
+    await page.getByLabel('Amount').fill('900');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.getByText('This book has 880 pages; enter at most 880.').waitFor();
+    await page.screenshot({ path: 'screenshots/rn-desktop-1440-progress-validation.png' });
+    await page.goto(`/reading/${seeded.activeSessionId}`);
+    await page.getByRole('button', { name: 'Mark as finished…' }).click();
+    await page.screenshot({ path: 'screenshots/rn-desktop-1440-finish-dialog.png' });
+
+    await page.goto(`/notes/${seeded.noteId}`);
+    await page.getByRole('button', { name: 'Delete note' }).click();
+    await page.screenshot({ path: 'screenshots/rn-desktop-1440-delete-note-dialog.png' });
   });
 });

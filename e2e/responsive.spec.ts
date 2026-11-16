@@ -1,16 +1,10 @@
 import type { Page } from '@playwright/test';
 import { navLabels, pages } from './routes';
+import { expectNoHorizontalScroll } from './support/layout';
 import { expect, test } from './support/reader';
 
 const phoneWidths = [320, 390];
 const wideWidths = [768, 1024, 1440];
-
-async function expectNoHorizontalScroll(page: Page) {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
-}
 
 function primaryNav(page: Page) {
   return page.getByRole('navigation', { name: 'Primary' });

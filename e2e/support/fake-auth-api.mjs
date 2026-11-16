@@ -7,7 +7,9 @@
 //   +shortsession  the session ends after 8 s
 //   outage@...     login drops the connection (network failure)
 //   ratelimited@   login answers 429 with Retry-After: 90
-// Every library endpoint answers 503, so the library's outage handling can be tested.
+// Every library, reading and notes endpoint answers 503, so outage handling can be tested, except
+// one healthy book (HEALTHY_BOOK_ID, with no groups), so a book page whose reading and notes
+// sections are down can be shown.
 // Test-only endpoints under /__test are served on loopback only.
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -196,10 +198,35 @@ const routes = {
   },
 };
 
-const LIBRARY_PATHS = /^\/api\/v1\/(books|copies|locations|categories|collections|wishlist)(\/|$)/;
+const LIBRARY_PATHS =
+  /^\/api\/v1\/(books|copies|locations|categories|collections|wishlist|reading-sessions|notes)(\/|$)/;
+const HEALTHY_BOOK_ID = '0000000000000000000000b0';
+const EPOCH = '2026-01-01T00:00:00.000Z';
+const EMPTY_PAGE = {
+  data: [],
+  meta: { pagination: { page: 1, limit: 100, total: 0, totalPages: 0 } },
+};
+const HEALTHY = {
+  [`/api/v1/books/${HEALTHY_BOOK_ID}`]: {
+    data: {
+      id: HEALTHY_BOOK_ID,
+      title: 'A Healthy Book',
+      authors: ['Test Author'],
+      format: 'ebook',
+      createdAt: EPOCH,
+      updatedAt: EPOCH,
+    },
+  },
+  [`/api/v1/books/${HEALTHY_BOOK_ID}/organization`]: {
+    data: { bookId: HEALTHY_BOOK_ID, categories: [], collections: [] },
+  },
+  '/api/v1/categories': EMPTY_PAGE,
+  '/api/v1/collections': EMPTY_PAGE,
+};
 
 createServer((request, response) => {
   const path = new URL(request.url, 'http://x').pathname;
+  if (request.method === 'GET' && HEALTHY[path]) return send(response, 200, HEALTHY[path]);
   if (LIBRARY_PATHS.test(path)) {
     return fail(
       response,

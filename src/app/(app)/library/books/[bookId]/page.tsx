@@ -10,6 +10,8 @@ import { ExternalLink } from '@/components/library/external-link';
 import { BookGroupsEditor } from '@/components/library/group-membership';
 import { LibraryBreadcrumb } from '@/components/library/library-breadcrumb';
 import { Notice } from '@/components/library/notice';
+import { BookNotesSection } from '@/components/notes/book-notes-section';
+import { BookReadingSection } from '@/components/reading/book-reading-section';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -26,6 +28,8 @@ import {
   listCopies,
 } from '@/server/library/library-api';
 import { loadAsReader } from '@/server/library/reader-data';
+import { listBookNotes } from '@/server/notes/note-api';
+import { getReadingOverview, listBookSessions } from '@/server/reading/reading-api';
 
 export const metadata: Metadata = { title: 'Book' };
 
@@ -63,6 +67,17 @@ export default async function BookPage({
   }
 
   const { book, copies, locations, organization, categories, collections } = result.value;
+  // Reading and notes degrade on their own: an outage there never hides a healthy book record.
+  const [reading, notes] = await Promise.all([
+    loadAsReader(async (api) => {
+      const [overview, recent] = await Promise.all([
+        getReadingOverview(api, book.id),
+        listBookSessions(api, book.id, { page: 1, limit: 5 }),
+      ]);
+      return { overview, recent };
+    }),
+    loadAsReader((api) => listBookNotes(api, book.id, { page: 1, limit: 3 })),
+  ]);
   return (
     <>
       <PageHeader
@@ -91,6 +106,9 @@ export default async function BookPage({
       <Card className="mb-10">
         <BookDetails book={book} />
       </Card>
+
+      <BookReadingSection book={book} data={reading} />
+      <BookNotesSection bookId={book.id} data={notes} />
 
       <section aria-labelledby="copies-heading" className="mb-10">
         <SectionHeader

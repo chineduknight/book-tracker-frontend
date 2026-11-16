@@ -105,4 +105,16 @@ describe('BookPicker', () => {
     );
     expect(await screen.findByText(/Showing 20 of 25 matching books/)).toBeVisible();
   });
+
+  it('never submits a surrounding form when Enter is pressed in the search box', async () => {
+    const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+    const user = userEvent.setup();
+    render(
+      <form onSubmit={onSubmit}>
+        <BookPicker label="Which book?" chooseLabel="Choose" onChoose={vi.fn()} />
+      </form>,
+    );
+    await user.type(screen.getByLabelText('Which book?'), 'middlemarch{Enter}');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

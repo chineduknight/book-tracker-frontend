@@ -135,6 +135,10 @@ export function BookPicker({
           type="search"
           value={text}
           onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            // Searching is live; Enter must never submit a form the picker sits in.
+            if (event.key === 'Enter') event.preventDefault();
+          }}
           placeholder="Title or author words"
           className="min-h-11 w-full rounded-lg border border-line-strong bg-surface py-2 pr-3 pl-10 text-base text-ink"
         />
