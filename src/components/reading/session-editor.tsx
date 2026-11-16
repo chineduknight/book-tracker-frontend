@@ -140,7 +140,13 @@ export function SessionEditor({
             onClick={() => {
               setError(null);
               setErrors({});
-              setIsFinishing(true);
+                              // Reset the finish‑date input when opening the dialog
+                const form = formRef.current;
+                if (form) {
+                  const dateInput = form.querySelector<HTMLInputElement>('input[name="completedOn"]');
+                  if (dateInput) dateInput.value = '';
+                }
+                setIsFinishing(true);
             }}
           >
             <CircleCheck aria-hidden="true" className="size-4" />
@@ -161,7 +167,15 @@ export function SessionEditor({
           pendingLabel="Saving…"
           isPending={isPending}
           onConfirm={() => void finish()}
-          onCancel={() => setIsFinishing(false)}
+          onCancel={() => {
+                // Clear the pending finish date when cancelling
+                const form = formRef.current;
+                if (form) {
+                  const dateInput = form.querySelector<HTMLInputElement>('input[name="completedOn"]');
+                  if (dateInput) dateInput.value = '';
+                }
+                setIsFinishing(false);
+              }}
           error={isFinishing ? <ActionError error={error} /> : null}
         >
           <div className="flex flex-col gap-4">
