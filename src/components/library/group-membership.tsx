@@ -131,11 +131,14 @@ export function BookGroupsEditor({
 /** On a group's page: add books by searching the catalogue. */
 export function GroupBookAdder({
   kind,
+  noun,
   groupId,
   memberIds,
 }: {
   kind: GroupKind;
+  noun: string;
   groupId: string;
+  /** Every current member, from all pages. */
   memberIds: readonly string[];
 }) {
   const router = useRouter();
@@ -158,6 +161,7 @@ export function GroupBookAdder({
         chooseLabel="Add"
         onChoose={add}
         excludeIds={memberIds}
+        excludedReason={`already in this ${noun}`}
         isPending={isPending}
       />
       <p role="status" className="text-sm text-ink-muted">

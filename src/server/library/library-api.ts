@@ -233,6 +233,21 @@ export function listGroupBooks(
   });
 }
 
+/** Every member's id, across all pages, so pickers never offer a book that is already in. */
+export async function listAllGroupBookIds(
+  api: ApiClient,
+  kind: GroupKind,
+  groupId: string,
+): Promise<string[]> {
+  const books = await everyPage((page) =>
+    api.getPage(groupBooksPath(kind, groupId), {
+      query: { page, limit: 100 },
+      parse: parseWith(bookSchema),
+    }),
+  );
+  return books.map((book) => book.id);
+}
+
 /** Idempotent; the API answers 204 No Content. */
 export async function addBookToGroup(
   api: ApiClient,

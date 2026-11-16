@@ -10,6 +10,7 @@ import { hrefWithQuery, parsePage, type SearchParams } from '@/lib/library/queri
 import type { GroupKind } from '@/lib/library/rules';
 import {
   getGroup,
+  listAllGroupBookIds,
   listCategoryPresets,
   listGroupBooks,
   listGroups,
@@ -135,7 +136,11 @@ export async function GroupDetailPage({
     hrefWithQuery(`/library/${kind}/${groupId}`, { page: target }, { page: 1 });
   const result = await loadAsReader(async (api) => {
     const group = await getGroup(api, kind, groupId);
-    return { group, books: await listGroupBooks(api, kind, group.id, page) };
+    const [books, memberIds] = await Promise.all([
+      listGroupBooks(api, kind, group.id, page),
+      listAllGroupBookIds(api, kind, group.id),
+    ]);
+    return { group, books, memberIds };
   });
   const back = <LibraryBreadcrumb href={`/library/${kind}`} label={copy.title} />;
 
@@ -149,7 +154,7 @@ export async function GroupDetailPage({
     );
   }
 
-  const { group, books } = result.value;
+  const { group, books, memberIds } = result.value;
   return (
     <>
       <PageHeader title={group.name} description={group.description} before={back} />
@@ -195,11 +200,7 @@ export async function GroupDetailPage({
       <section aria-labelledby="group-add">
         <SectionHeader id="group-add" title={`Add books to this ${copy.one}`} />
         <Card>
-          <GroupBookAdder
-            kind={kind}
-            groupId={group.id}
-            memberIds={books.items.map((book) => book.id)}
-          />
+          <GroupBookAdder kind={kind} noun={copy.one} groupId={group.id} memberIds={memberIds} />
         </Card>
       </section>
     </>

@@ -179,6 +179,10 @@ describe('categories and collections', () => {
     await library.addBookToGroup(alice, 'categories', category.id, second.id);
     const members = await library.listGroupBooks(alice, 'categories', category.id, 1);
     expect(members.items.map((book) => book.title)).toEqual(['Meditations', 'Ethics']);
+    await expect(library.listAllGroupBookIds(alice, 'categories', category.id)).resolves.toEqual([
+      second.id,
+      first.id,
+    ]);
 
     const organization = await library.getBookOrganization(alice, first.id);
     expect(organization.categories.map((group) => group.id)).toEqual([category.id]);
