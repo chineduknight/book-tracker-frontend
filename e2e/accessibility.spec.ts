@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { pages, publicPages } from './routes';
 import { expect, libraryApi, test, uniqueWord } from './support/reader';
+import { readingAndNotesPaths, seedReadingAndNotes } from './support/reading-notes';
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
@@ -123,6 +124,41 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto('/library/new');
         await page.getByRole('button', { name: 'Add book' }).click();
         await expect(page.getByLabel('Title')).toHaveAttribute('aria-invalid', 'true');
+        await expectNoViolations(page);
+      });
+
+      test('reading and notes pages, forms, errors and dialogs have no violations', async ({
+        page,
+        baseURL,
+      }) => {
+        test.slow();
+        const seeded = await seedReadingAndNotes(page, baseURL!);
+        for (const path of readingAndNotesPaths(seeded)) {
+          await page.goto(path);
+          await expectNoViolations(page);
+        }
+
+        await page.goto(`/reading/${seeded.activeSessionId}`);
+        await page.getByLabel('Amount').fill('99999');
+        await page.getByRole('button', { name: 'Save changes' }).click();
+        await expect(page.getByLabel('Amount')).toHaveAttribute('aria-invalid', 'true');
+        await expectNoViolations(page);
+        await page.getByRole('button', { name: 'Mark as finished…' }).click();
+        await expect(page.getByRole('dialog')).toBeVisible();
+        await expectNoViolations(page);
+
+        await page.goto(`/notes/new?bookId=${seeded.bookId}`);
+        await page.getByRole('button', { name: 'Save note' }).click();
+        await expect(page.getByText('Choose note or highlight.')).toBeVisible();
+        await expectNoViolations(page);
+        await page.getByLabel('Your note').fill('Unsaved words');
+        await page.getByRole('link', { name: 'Cancel' }).click();
+        await expect(page.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeVisible();
+        await expectNoViolations(page);
+
+        await page.goto(`/notes/${seeded.highlightId}`);
+        await page.getByRole('button', { name: 'Delete highlight' }).click();
+        await expect(page.getByRole('dialog')).toBeVisible();
         await expectNoViolations(page);
       });
 

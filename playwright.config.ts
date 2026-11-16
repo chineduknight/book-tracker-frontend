@@ -48,6 +48,9 @@ const realApiSpecs = [
   'accessibility.spec.ts',
   'library.spec.ts',
   'library-security.spec.ts',
+  'reading.spec.ts',
+  'notes.spec.ts',
+  'reading-notes-layout.spec.ts',
   'walkthrough.spec.ts',
 ];
 const mobile = devices['Pixel 7'];

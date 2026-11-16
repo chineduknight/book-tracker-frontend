@@ -10,9 +10,12 @@ What exists so far:
 - registration, sign-in, logout and an account menu, with browser sessions handled by a server-side
   Backend-for-Frontend (FE #16);
 - the Library: catalogue, books, physical copies, locations, categories, collections and the
-  wishlist with acquisition (FE #17; see [docs/library-contract.md](docs/library-contract.md)).
+  wishlist with acquisition (FE #17; see [docs/library-contract.md](docs/library-contract.md));
+- Reading and Notes: reading sessions with progress, explicit completion and rereads, and private
+  notes and highlights with search (FE #18; see
+  [docs/reading-notes-contract.md](docs/reading-notes-contract.md)).
 
-Reading, Notes and Lending remain placeholders until FE #18–#19.
+Lending and the Home overview remain placeholders until FE #19.
 
 ## Requirements
 
@@ -79,7 +82,7 @@ BACKEND_DIR=../backend-for-tests npm run test:e2e
 
 The browser suite runs two app instances: port 3100 against a fake of the API's auth endpoints (for
 session faults such as outages, rate limits and short sessions) and port 3200 against the real API
-(every library journey). The real API allows 20 registrations per hour per process, so each test
+(every library, reading and notes journey). The real API allows 20 registrations per hour per process, so each test
 worker signs in to one reader account.
 
 First Playwright run: `npx playwright install chromium`. Integration and e2e tests expect MongoDB
@@ -90,15 +93,17 @@ to `screenshots/` (git-ignored; CI uploads them as the `visual-walkthrough` arti
 
 ## Routes
 
-| Route                                                     | Access     | Purpose                                                    |
-| --------------------------------------------------------- | ---------- | ---------------------------------------------------------- |
-| `/login`, `/register`                                     | Signed out | Sign in, create an account (signed-in readers go home)     |
-| `/`                                                       | Signed in  | Home (FE #19 adds the overview)                            |
-| `/library` (+ `/categories`, `/collections`, `/wishlist`) | Signed in  | Library placeholders (FE #17)                              |
-| `/reading`, `/notes`                                      | Signed in  | Placeholders (FE #18)                                      |
-| `/lending`                                                | Signed in  | Placeholder (FE #19)                                       |
-| `POST /api/session/register`, `/login`, `/logout`         | BFF        | Same-origin JSON only; return a safe profile, never tokens |
-| `GET /api/session/me`                                     | BFF        | The signed-in reader's name and email                      |
+| Route                                                              | Access     | Purpose                                                    |
+| ------------------------------------------------------------------ | ---------- | ---------------------------------------------------------- |
+| `/login`, `/register`                                              | Signed out | Sign in, create an account (signed-in readers go home)     |
+| `/`                                                                | Signed in  | Home (FE #19 adds the overview)                            |
+| `/library` (+ books, locations, categories, collections, wishlist) | Signed in  | The Library (FE #17)                                       |
+| `/reading` (+ `/new`, `/[sessionId]`)                              | Signed in  | Reading history, starting, progress, finishing (FE #18)    |
+| `/notes` (+ `/new`, `/[noteId]`, `/[noteId]/edit`)                 | Signed in  | Notes and highlights (FE #18)                              |
+| `/api/library/*`, `/api/reading/*`, `/api/notes/*`                 | BFF        | One allowlisted API operation per route; never a proxy     |
+| `/lending`                                                         | Signed in  | Placeholder (FE #19)                                       |
+| `POST /api/session/register`, `/login`, `/logout`                  | BFF        | Same-origin JSON only; return a safe profile, never tokens |
+| `GET /api/session/me`                                              | BFF        | The signed-in reader's name and email                      |
 
 A signed-out visit to a private page redirects to `/login?next=<page>`; only known application paths
 are accepted as `next`. The five tabs are defined once in
