@@ -12,12 +12,16 @@ const RETURN_DESTINATIONS: ReadonlySet<string> = new Set([
   '/library/new',
   '/library/locations',
   '/library/wishlist/new',
+  '/reading/new',
+  '/notes/new',
 ]);
 
 /** Deep library pages, anchored and limited to lowercase API ids. */
 const RETURN_PATTERNS: readonly RegExp[] = [
   /^\/library\/books\/[0-9a-f]{24}(\/edit)?$/,
   /^\/library\/(categories|collections|wishlist)\/[0-9a-f]{24}$/,
+  /^\/reading\/[0-9a-f]{24}$/,
+  /^\/notes\/[0-9a-f]{24}(\/edit)?$/,
 ];
 
 export const DEFAULT_SIGNED_IN_PATH = '/';

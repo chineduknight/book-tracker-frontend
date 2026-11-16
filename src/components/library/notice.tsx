@@ -8,6 +8,13 @@ const NOTICES = {
   'group-deleted': 'Deleted. Its books are still in your library.',
   'wish-created': 'Added to your wishlist.',
   'wish-deleted': 'Wish deleted.',
+  'reading-started': 'Reading started. Record your progress whenever you like.',
+  'reading-recorded': 'Finished read recorded.',
+  'reading-saved': 'Changes saved.',
+  'reading-finished': 'Reading marked as finished. It stays in your history.',
+  'note-created': 'Saved.',
+  'note-saved': 'Changes saved.',
+  'note-deleted': 'Deleted. It no longer appears in your notes or searches.',
 } as const;
 
 export type NoticeKey = keyof typeof NOTICES;

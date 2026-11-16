@@ -8,6 +8,8 @@ interface ConfirmDialogProps {
   title: string;
   children: ReactNode;
   confirmLabel: string;
+  /** Defaults to "Cancel". */
+  cancelLabel?: string;
   pendingLabel: string;
   isPending: boolean;
   onConfirm: () => void;
@@ -27,6 +29,7 @@ export function ConfirmDialog({
   title,
   children,
   confirmLabel,
+  cancelLabel = 'Cancel',
   pendingLabel,
   isPending,
   onConfirm,
@@ -62,7 +65,7 @@ export function ConfirmDialog({
         {error}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={onCancel} aria-disabled={isPending}>
-            Cancel
+            {cancelLabel}
           </Button>
           <Button
             onClick={() => {

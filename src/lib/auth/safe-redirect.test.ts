@@ -59,6 +59,27 @@ describe('library deep links', () => {
   });
 });
 
+describe('reading and notes return paths', () => {
+  const id = '665f1c2ab4e5d1a2b3c4d5e6';
+
+  it.each(['/reading/new', '/notes/new', `/reading/${id}`, `/notes/${id}`, `/notes/${id}/edit`])(
+    'accepts %s',
+    (path) => {
+      expect(safeReturnPath(path)).toBe(path);
+    },
+  );
+
+  it.each([
+    `/reading/${id}/edit`,
+    `/reading/new?bookId=${id}`,
+    `/notes/${id}/delete`,
+    `/notes/${id.toUpperCase()}`,
+    `/notes/../${id}`,
+  ])('rejects %s', (path) => {
+    expect(safeReturnPath(path)).toBe('/');
+  });
+});
+
 describe('loginPathFor', () => {
   it('carries a known destination, encoded', () => {
     expect(loginPathFor('/library/wishlist')).toBe('/login?next=%2Flibrary%2Fwishlist');
