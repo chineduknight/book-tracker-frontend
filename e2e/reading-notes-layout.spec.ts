@@ -1,20 +1,8 @@
-import type { Page } from '@playwright/test';
-import { expect, test } from './support/reader';
+import { expectNoHorizontalScroll } from './support/layout';
+import { test } from './support/reader';
 import { readingAndNotesPaths, seedReadingAndNotes } from './support/reading-notes';
 
 /* Reading and notes pages hold their layout on small phones, at doubled text size and on tablets. */
-
-async function expectNoHorizontalScroll(page: Page, path: string) {
-  const { overflow, culprits } = await page.evaluate(() => {
-    const width = document.documentElement.clientWidth;
-    const culprits = [...document.querySelectorAll('body *')]
-      .filter((el) => el.getBoundingClientRect().right > width + 1)
-      .slice(-5)
-      .map((el) => `${el.tagName.toLowerCase()}.${el.className}`.slice(0, 120));
-    return { overflow: document.documentElement.scrollWidth - width, culprits };
-  });
-  expect(overflow, `${path} — overflowing: ${culprits.join(' | ')}`).toBeLessThanOrEqual(0);
-}
 
 test.describe('phone 320px', () => {
   test.skip(({ isMobile }) => !isMobile, 'phone widths run in the mobile project');
