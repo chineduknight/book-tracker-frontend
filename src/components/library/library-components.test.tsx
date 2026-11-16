@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Book, PhysicalCopy } from '@/lib/library/types';
 import { BookForm } from './book-form';
-import { copyName } from './copies-manager';
+import { copyAddedOn, copyName } from './copies-manager';
 
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -131,16 +131,32 @@ describe('BookForm', () => {
 });
 
 describe('copyName', () => {
-  const copy: PhysicalCopy = {
-    id: 'b'.repeat(24),
+  const sameDay = (id: string, time: string): PhysicalCopy => ({
+    id,
     bookId: book.id,
     locationId: null,
-    createdAt: '2026-11-15T23:30:00.000Z',
+    createdAt: `2026-11-15T${time}.000Z`,
     updatedAt: NOW,
-  };
+  });
+  const first = sameDay('665f1c2ab4e5d1a2b3a10001', '09:00:00');
+  const second = sameDay('665f1c2ab4e5d1a2b3a10002', '09:00:00');
 
-  it('uses the label, or a stable added date (UTC) that does not depend on list position', () => {
-    expect(copyName({ ...copy, label: 'Signed' })).toBe('Signed');
-    expect(copyName(copy)).toBe('Unlabelled copy added 15 Nov 2026');
+  it('distinguishes unlabelled copies added the same day by a permanent reference', () => {
+    expect(copyName(first)).toBe('Unlabelled copy #a10001');
+    expect(copyName(second)).toBe('Unlabelled copy #a10002');
+    expect(copyAddedOn(first)).toBe(copyAddedOn(second));
+  });
+
+  it('does not depend on list position, so adding a copy changes no name', () => {
+    const third = sameDay('665f1c2ab4e5d1a2b3a10003', '09:30:00');
+    const before = [second, first].map(copyName);
+    const after = [third, second, first].map(copyName);
+    expect(after.slice(1)).toEqual(before);
+    expect(new Set(after).size).toBe(3);
+  });
+
+  it('keeps the reference next to a label, so copies with the same label differ too', () => {
+    expect(copyName({ ...first, label: 'Paperback' })).toBe('Paperback #a10001');
+    expect(copyName({ ...second, label: 'Paperback' })).toBe('Paperback #a10002');
   });
 });

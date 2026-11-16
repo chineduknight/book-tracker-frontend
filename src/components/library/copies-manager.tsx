@@ -35,11 +35,22 @@ interface CopiesManagerProps {
 const ADDED_DATE = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
 
 /**
- * A name that stays the same however many copies are added: the reader's label, or when the copy
- * was recorded (UTC, so the server and the browser render it identically).
+ * A permanent short reference for a copy: the end of its API id, where a MongoDB ObjectId keeps its
+ * per-insert counter, so copies added in the same second still differ. Never the list position,
+ * which shifts whenever a copy is added.
  */
+export function copyReference(copy: PhysicalCopy): string {
+  return `#${copy.id.slice(-6)}`;
+}
+
+/** The copy's name everywhere it is acted on: rows, Edit and Delete labels, dialogs. */
 export function copyName(copy: PhysicalCopy): string {
-  return copy.label ?? `Unlabelled copy added ${ADDED_DATE.format(new Date(copy.createdAt))}`;
+  return `${copy.label ?? 'Unlabelled copy'} ${copyReference(copy)}`;
+}
+
+/** When the copy was recorded (UTC, so the server and the browser render it identically). */
+export function copyAddedOn(copy: PhysicalCopy): string {
+  return ADDED_DATE.format(new Date(copy.createdAt));
 }
 
 /** The physical copies of one physical book. Lending status arrives with the lending milestone. */
@@ -70,6 +81,7 @@ export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps)
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="font-medium break-words text-ink">{copyName(copy)}</p>
+                    <p className="text-xs text-ink-muted">Added {copyAddedOn(copy)}</p>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <Badge>
                         {copy.condition

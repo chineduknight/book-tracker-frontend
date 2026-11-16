@@ -54,7 +54,7 @@ test('the full library journey, from an empty library', async ({ page, baseURL }
   await expect(page.getByText('Signed hardback')).toBeVisible();
   await page.getByRole('button', { name: 'Add a copy' }).click();
   await page.getByRole('button', { name: 'Add copy' }).click();
-  await expect(page.getByText(/^Unlabelled copy added /)).toBeVisible();
+  await expect(page.getByText(/^Unlabelled copy #[0-9a-f]{6}$/)).toBeVisible();
   await expect(page.getByText('Unassigned', { exact: true })).toBeVisible();
 
   // Organise: a category from a preset suggestion and a collection.
@@ -138,7 +138,7 @@ test('a book with copy history cannot become an ebook, and unsaved edits survive
   const url = await addBook(page, { title: uniqueWord('Copied') });
   await page.getByRole('button', { name: 'Add a copy' }).click();
   await page.getByRole('button', { name: 'Add copy' }).click();
-  await expect(page.getByText(/^Unlabelled copy added /)).toBeVisible();
+  await expect(page.getByText(/^Unlabelled copy #[0-9a-f]{6}$/)).toBeVisible();
 
   await page.goto(`${url}/edit`);
   await page.getByLabel('Edition (optional)').fill('Second edition');
@@ -309,4 +309,95 @@ test('the confirmation dialog traps focus and Escape returns it', async ({ page 
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
   await expect(page).toHaveURL(url);
+});
+
+test('the picker reaches book 21 when the first 20 matches are already in a collection', async ({
+  page,
+  baseURL,
+}) => {
+  test.slow();
+  const word = uniqueWord('many');
+  const ids: string[] = [];
+  for (let index = 0; index < 21; index += 1) {
+    const book = await libraryApi<{ id: string }>(page, baseURL!, 'POST', '/api/library/books', {
+      title: `${word} ${String(index).padStart(2, '0')}`,
+      format: 'ebook',
+    });
+    ids.push(book.id);
+  }
+  // Newest first: the first page of matches is books 01–20, so book 00 is on page 2.
+  const collection = await libraryApi<{ id: string }>(
+    page,
+    baseURL!,
+    'POST',
+    '/api/library/collections',
+    {
+      name: `Shelf ${word}`,
+    },
+  );
+  for (const id of ids.slice(1)) {
+    await libraryApi(
+      page,
+      baseURL!,
+      'PUT',
+      `/api/library/collections/${collection.id}/books/${id}`,
+    );
+  }
+
+  await page.goto(`/library/collections/${collection.id}`);
+  await page.getByLabel('Find a book to add').fill(word);
+  await expect(
+    page.getByText(
+      'Showing 20 of 21 matching books. 20 shown so far are already in this collection.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/no other books/i)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Load more books' }).click();
+  await page.getByRole('button', { name: `Add ${word} 00` }).click();
+  await expect(page.getByRole('status').filter({ hasText: `Added ${word} 00.` })).toBeVisible();
+  await expect(page.getByText('Page 1 of 2 · 21 books')).toBeVisible();
+
+  const wish = await libraryApi<{ id: string }>(page, baseURL!, 'POST', '/api/library/wishlist', {
+    title: `Wanted ${word}`,
+  });
+  await page.goto(`/library/wishlist/${wish.id}`);
+  await page.getByLabel('Find the book in your library').fill(word);
+  await expect(page.getByText('Showing 20 of 21 matching books.')).toBeVisible();
+  await page.getByRole('button', { name: 'Load more books' }).click();
+  await page.getByRole('button', { name: `Choose ${word} 00` }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Mark acquired' }).click();
+  await expect(page.getByRole('link', { name: `${word} 00` })).toBeVisible();
+});
+
+test('unlabelled copies added the same day keep distinct, stable names', async ({ page }) => {
+  const url = await addBook(page, { title: uniqueWord('Twins') });
+  await page.goto(url);
+  for (let count = 0; count < 2; count += 1) {
+    await page.getByRole('button', { name: 'Add a copy' }).click();
+    await page.getByRole('button', { name: 'Add copy' }).click();
+    await expect(page.getByRole('button', { name: /^Edit Unlabelled copy #/ })).toHaveCount(
+      count + 1,
+    );
+  }
+  const editNames = async () =>
+    page
+      .getByRole('button', { name: /^Edit Unlabelled copy #[0-9a-f]{6}$/ })
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.textContent?.replace(/^Edit\s*/, '').trim()),
+      );
+  const before = await editNames();
+  expect(new Set(before).size).toBe(2);
+
+  await page.getByRole('button', { name: 'Add a copy' }).click();
+  await page.getByRole('button', { name: 'Add copy' }).click();
+  await expect(page.getByRole('button', { name: /^Edit Unlabelled copy #/ })).toHaveCount(3);
+  const after = await editNames();
+  expect(new Set(after).size).toBe(3);
+  for (const name of before) expect(after).toContain(name);
+
+  await page
+    .getByRole('button', { name: /^Delete copy/ })
+    .first()
+    .click();
+  await expect(page.getByRole('dialog')).toContainText(`Delete ${after[0]}?`);
 });
