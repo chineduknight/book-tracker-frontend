@@ -14,6 +14,10 @@ const NOTICES = {
   'reading-finished': 'Reading marked as finished. It stays in your history.',
   'note-created': 'Saved.',
   'note-saved': 'Changes saved.',
+  'loan-created': 'Loan recorded.',
+  'loan-saved': 'Changes saved.',
+  'loan-returned':
+    'Marked returned. The copy is free for a new loan; this loan stays in its history.',
   'note-deleted': 'Deleted. It no longer appears in your notes or searches.',
 } as const;
 
