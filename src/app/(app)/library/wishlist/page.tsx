@@ -70,9 +70,9 @@ export default async function WishlistPage({ searchParams }: PageProps<'/library
         action="/library/wishlist"
         role="search"
         aria-label="Filter your wishlist"
-        className="mb-6 grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end"
+        className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4"
       >
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-[1_1_16rem] flex-col gap-1.5">
           <label htmlFor="wish-q" className="text-sm font-medium text-ink">
             Search titles, authors and notes
           </label>
@@ -85,7 +85,7 @@ export default async function WishlistPage({ searchParams }: PageProps<'/library
             className={fieldClass}
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1.5">
           <label htmlFor="wish-status" className="text-sm font-medium text-ink">
             Status
           </label>
@@ -97,7 +97,7 @@ export default async function WishlistPage({ searchParams }: PageProps<'/library
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1.5">
           <label htmlFor="wish-priority" className="text-sm font-medium text-ink">
             Priority
           </label>
@@ -115,7 +115,7 @@ export default async function WishlistPage({ searchParams }: PageProps<'/library
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1.5">
           <label htmlFor="wish-sort" className="text-sm font-medium text-ink">
             Sort
           </label>

@@ -62,9 +62,9 @@ export default async function LibraryPage({ searchParams }: PageProps<'/library'
           action="/library"
           role="search"
           aria-label="Search your books"
-          className="mb-6 grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end"
+          className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4"
         >
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-[1_1_16rem] flex-col gap-1.5">
             <label htmlFor="library-q" className="text-sm font-medium text-ink">
               Search titles and authors
             </label>
@@ -75,13 +75,13 @@ export default async function LibraryPage({ searchParams }: PageProps<'/library'
               maxLength={LIMITS.search}
               defaultValue={query.q ?? ''}
               aria-describedby="library-q-hint"
-              className="min-h-11 rounded-lg border border-line-strong bg-surface px-3 text-base text-ink"
+              className="min-h-11 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 text-base text-ink"
             />
             <p id="library-q-hint" className="text-xs text-ink-muted">
               Matches whole words in any order, e.g. “eliot march”.
             </p>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-1.5">
             <label htmlFor="library-format" className="text-sm font-medium text-ink">
               Format
             </label>
@@ -89,7 +89,7 @@ export default async function LibraryPage({ searchParams }: PageProps<'/library'
               id="library-format"
               name="format"
               defaultValue={query.format ?? ''}
-              className="min-h-11 rounded-lg border border-line-strong bg-surface px-3 text-base text-ink"
+              className="min-h-11 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 text-base text-ink"
             >
               <option value="">All formats</option>
               {BOOK_FORMATS.map((format) => (
@@ -99,7 +99,7 @@ export default async function LibraryPage({ searchParams }: PageProps<'/library'
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-[1_1_10rem] flex-col gap-1.5">
             <label htmlFor="library-sort" className="text-sm font-medium text-ink">
               Sort
             </label>
@@ -107,7 +107,7 @@ export default async function LibraryPage({ searchParams }: PageProps<'/library'
               id="library-sort"
               name="sort"
               defaultValue={query.sort}
-              className="min-h-11 rounded-lg border border-line-strong bg-surface px-3 text-base text-ink"
+              className="min-h-11 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 text-base text-ink"
             >
               {BOOK_SORTS.map((sort) => (
                 <option key={sort} value={sort}>
@@ -118,7 +118,7 @@ export default async function LibraryPage({ searchParams }: PageProps<'/library'
           </div>
           <button
             type="submit"
-            className="min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:bg-accent-hover"
+            className="min-h-11 flex-[0_0_auto] rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:bg-accent-hover"
           >
             Apply
           </button>

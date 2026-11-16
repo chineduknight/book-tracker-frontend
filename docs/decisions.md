@@ -93,6 +93,27 @@ Choices worth recording:
 Still not built: password reset, email verification, account settings or deletion, "log out
 everywhere", MFA and social sign-in.
 
+## Library interface (FE #17)
+
+Recorded in detail in [library-contract.md](library-contract.md). The main decisions:
+
+- **Server components read, route handlers write.** Pages load private data on the server per
+  request, and client components write through explicit `/api/library/*` routes that share one
+  hardened pipeline. There is no generic proxy, no Server Actions and no client-side data library.
+  `router.refresh()` re-renders the affected view after a write, and nothing is optimistic.
+- **The API's semantics, not invented ones.** No reading status, copy counts or availability.
+  Duplicates are suggestions. Presets are suggestions. Membership order is the API's. There are no
+  controls without an endpoint (location delete, reordering, un-acquiring).
+- **Uncontrolled form fields.** Controlled inputs lost text typed before hydration (found by a
+  flaky browser test under load). All forms now read values from the form element on submit, and
+  React state holds only errors and live hints.
+- **Plain, accessible primitives** (native select, textarea, `<dialog>`), with no new UI
+  dependency. FE #17 adds no dependencies at all,
+  and zod remains server-only.
+- **Tested against the real API.** Contract tests and the library browser journeys run against
+  `book-tracker-backend` pinned in CI, on disposable local databases. The fake auth API is kept
+  only for session faults the real API cannot produce on demand.
+
 ## API transport
 
 See the README's "Backend integration" section for the interface. Choices worth recording:
