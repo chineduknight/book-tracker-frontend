@@ -73,3 +73,47 @@ test('a note cannot be saved while the catalogue is down, and its text is kept',
   ).toBeVisible();
   await expect(page.getByLabel('Your note')).toHaveValue('Kept through the outage');
 });
+
+test('a lending outage is shown as unavailable, never as "no loans"', async ({ page }) => {
+  await registerViaApi(page, { email: uniqueEmail() });
+  for (const path of ['/lending', '/lending?status=overdue', '/lending?status=all']) {
+    await page.goto(path);
+    await expect(page.getByRole('main').getByRole('alert')).toContainText(
+      'Your loans couldn’t be loaded.',
+    );
+    await expect(page.getByText(/No loans yet|Nothing is on loan|Nothing is overdue/)).toHaveCount(
+      0,
+    );
+  }
+  await page.goto(`/lending/new?copyId=${'0'.repeat(23)}1`);
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('couldn’t be loaded');
+  await expect(page.getByRole('button', { name: 'Record loan' })).toHaveCount(0);
+});
+
+test('Home shows each failed section as an error, never as zeroes', async ({ page }, testInfo) => {
+  await registerViaApi(page, { email: uniqueEmail() });
+  await page.goto('/');
+  const main = page.getByRole('main');
+  await expect(main.getByText('Your library’s numbers couldn’t be loaded.')).toBeVisible();
+  await expect(main.getByText('Reading statistics couldn’t be loaded.')).toBeVisible();
+  await expect(main.getByText('Recent activity couldn’t be loaded.')).toBeVisible();
+  await expect(
+    main.getByText(/No loans are overdue|Your library is empty|Nothing recorded yet/),
+  ).toHaveCount(0);
+  await expect(
+    main.getByRole('navigation', { name: 'Quick actions' }).getByRole('link'),
+  ).toHaveCount(5);
+
+  // One section healthy, the others down: the healthy one still shows its real numbers.
+  await page.context().clearCookies();
+  await registerViaApi(page, { email: uniqueEmail('+summaryok') });
+  await page.goto('/');
+  await expect(main.getByRole('link', { name: /^Books 3 / })).toBeVisible();
+  await expect(main.getByText('1 loan is overdue', { exact: false })).toBeVisible();
+  await expect(main.getByText('Reading statistics couldn’t be loaded.')).toBeVisible();
+  await expect(main.getByText('Recent activity couldn’t be loaded.')).toBeVisible();
+  await page.screenshot({
+    path: `screenshots/ld-${testInfo.project.name}-home-partial-outage.png`,
+    fullPage: true,
+  });
+});

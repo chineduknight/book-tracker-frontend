@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { pages, publicPages } from './routes';
 import { expect, libraryApi, test, uniqueWord } from './support/reader';
+import { lendingPaths, seedLending } from './support/lending';
 import { readingAndNotesPaths, seedReadingAndNotes } from './support/reading-notes';
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
@@ -159,6 +160,36 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await page.goto(`/notes/${seeded.highlightId}`);
         await page.getByRole('button', { name: 'Delete highlight' }).click();
         await expect(page.getByRole('dialog')).toBeVisible();
+        await expectNoViolations(page);
+      });
+
+      test('lending, Home, loan forms, errors and dialogs have no violations', async ({
+        page,
+        baseURL,
+      }) => {
+        test.slow();
+        const seeded = await seedLending(page, baseURL!);
+        for (const path of lendingPaths(seeded)) {
+          await page.goto(path);
+          await expectNoViolations(page);
+        }
+
+        await page.goto(`/lending/new?copyId=${seeded.copyIds[2]}`);
+        await page.getByRole('button', { name: 'Record loan' }).click();
+        await expect(page.getByLabel('Borrower')).toHaveAttribute('aria-invalid', 'true');
+        await expectNoViolations(page);
+
+        await page.goto(`/lending/${seeded.overdueLoanId}`);
+        await page.getByRole('button', { name: 'Mark returned…' }).click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Mark returned' }).click();
+        await expect(
+          page.getByRole('dialog').getByText('Enter the day it came back.'),
+        ).toBeVisible();
+        await expectNoViolations(page);
+
+        await page.goto(`/library/books/${seeded.bookId}`);
+        await page.getByRole('button', { name: /^Check loan status of Paperback/ }).click();
+        await expect(page.getByText(/On loan to/)).toBeVisible();
         await expectNoViolations(page);
       });
 

@@ -38,7 +38,7 @@ test.describe('registration', () => {
     await page.getByRole('button', { name: 'Create account' }).click();
 
     await expect(page).toHaveURL('/');
-    await expect(page.getByText('You’re signed in, Grace Hopper')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome back, Grace Hopper');
     await page.getByRole('button', { name: 'Account: Grace Hopper' }).click();
     await expect(page.getByText(email)).toBeVisible();
   });

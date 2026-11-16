@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { libraryApi, registerFreshReader, test, uniqueWord } from './support/reader';
+import { seedLending, type SeededLending } from './support/lending';
 import { seedReadingAndNotes, type SeededReading } from './support/reading-notes';
 
 /**
@@ -266,5 +267,117 @@ test.describe('visual walkthrough: reading and notes', () => {
     await page.goto(`/notes/${seeded.noteId}`);
     await page.getByRole('button', { name: 'Delete note' }).click();
     await page.screenshot({ path: 'screenshots/rn-desktop-1440-delete-note-dialog.png' });
+  });
+});
+
+const lendingShots = [
+  { name: 'ld-mobile-390-home', width: 390, scheme: 'light', path: () => '/' },
+  { name: 'ld-desktop-1440-home', width: 1440, scheme: 'light', path: () => '/' },
+  { name: 'ld-desktop-1440-home-dark', width: 1440, scheme: 'dark', path: () => '/' },
+  { name: 'ld-mobile-390-lending-active', width: 390, scheme: 'light', path: () => '/lending' },
+  {
+    name: 'ld-desktop-1440-lending-overdue-dark',
+    width: 1440,
+    scheme: 'dark',
+    path: () => '/lending?status=overdue',
+  },
+  {
+    name: 'ld-desktop-1440-lending-returned',
+    width: 1440,
+    scheme: 'light',
+    path: () => '/lending?status=returned',
+  },
+  {
+    name: 'ld-desktop-1440-choose-copy',
+    width: 1440,
+    scheme: 'light',
+    path: (s: SeededLending) => `/lending/new?bookId=${s.bookId}`,
+  },
+  {
+    name: 'ld-mobile-320-new-loan',
+    width: 320,
+    scheme: 'light',
+    path: (s: SeededLending) => `/lending/new?copyId=${s.copyIds[2]}`,
+  },
+  {
+    name: 'ld-desktop-1440-loan-overdue',
+    width: 1440,
+    scheme: 'light',
+    path: (s: SeededLending) => `/lending/${s.overdueLoanId}`,
+  },
+  {
+    name: 'ld-mobile-390-loan-returned-dark',
+    width: 390,
+    scheme: 'dark',
+    path: (s: SeededLending) => `/lending/${s.returnedLoanId}`,
+  },
+  {
+    name: 'ld-desktop-1440-copy-loans',
+    width: 1440,
+    scheme: 'light',
+    path: (s: SeededLending) => `/lending/copies/${s.copyIds[2]}`,
+  },
+] as const;
+
+test.describe('visual walkthrough: lending and Home', () => {
+  test.skip(({ isMobile }) => isMobile, 'captured once, from the desktop project');
+
+  test('lending and Home screens', async ({ page, baseURL }) => {
+    test.slow();
+    await registerFreshReader(page, baseURL!);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.screenshot({ path: 'screenshots/ld-desktop-1440-home-empty.png', fullPage: true });
+    await page.goto('/lending');
+    await page.screenshot({ path: 'screenshots/ld-desktop-1440-lending-empty.png' });
+
+    const seeded = await seedLending(page, baseURL!);
+    await seedReadingAndNotes(page, baseURL!);
+    for (const shot of lendingShots) {
+      await page.setViewportSize({ width: shot.width, height: shot.width >= 768 ? 900 : 844 });
+      await page.emulateMedia({ colorScheme: shot.scheme });
+      await page.goto(shot.path(seeded));
+      await page.waitForLoadState('networkidle');
+      await page.screenshot({ path: `screenshots/${shot.name}.png`, fullPage: shot.width >= 768 });
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto(`/lending/new?copyId=${seeded.copyIds[2]}`);
+    await page.getByLabel('Due back (optional)').fill('2020-01-01');
+    await page.getByRole('button', { name: 'Record loan' }).click();
+    await page.getByText('Enter who is borrowing the copy.').waitFor();
+    await page.screenshot({ path: 'screenshots/ld-desktop-1440-new-loan-errors.png' });
+
+    await page.goto(`/lending/${seeded.activeLoanId}`);
+    await page.getByRole('button', { name: 'Mark returned…' }).click();
+    await page.screenshot({ path: 'screenshots/ld-desktop-1440-return-dialog.png' });
+
+    await page.goto(`/library/books/${seeded.bookId}`);
+    // Each button is replaced by its result once checked.
+    const checks = page.getByRole('button', { name: /^Check loan status of/ });
+    for (const name of await checks.evaluateAll((buttons) =>
+      buttons.map((button) => button.getAttribute('aria-label') ?? ''),
+    )) {
+      const check = page.getByRole('button', { name, exact: true });
+      await check.click();
+      await check.waitFor({ state: 'detached' });
+    }
+    await page
+      .getByText(/On loan to/)
+      .first()
+      .waitFor();
+    await page.screenshot({
+      path: 'screenshots/ld-desktop-1440-copy-loan-state.png',
+      fullPage: true,
+    });
+
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto('/lending?status=all');
+    await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
+    await page.screenshot({ path: 'screenshots/ld-mobile-320-lending-200pct.png' });
+    await page.goto('/');
+    await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
+    await page.screenshot({ path: 'screenshots/ld-mobile-320-home-200pct.png' });
   });
 });

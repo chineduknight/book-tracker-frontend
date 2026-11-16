@@ -110,7 +110,8 @@ test('the full library journey, from an empty library', async ({ page, baseURL }
   // Delete: confirmed, soft, and gone from every view.
   await page.goto(bookUrl);
   await page.getByRole('button', { name: 'Delete book' }).click();
-  await expect(page.getByRole('dialog')).toContainText('no way to restore it');
+  await expect(page.getByRole('dialog')).toContainText('no way to restore the book');
+  await expect(page.getByRole('dialog')).toContainText('Loans of its copies stay in Lending');
   await page.getByRole('dialog').getByRole('button', { name: 'Delete book' }).click();
   await expect(page).toHaveURL('/library?notice=book-deleted');
   await expect(page.getByRole('heading', { name: 'Your library is empty' })).toBeVisible();

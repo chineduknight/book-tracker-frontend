@@ -15,7 +15,9 @@ What exists so far:
   notes and highlights with search (FE #18; see
   [docs/reading-notes-contract.md](docs/reading-notes-contract.md)).
 
-Lending and the Home overview remain placeholders until FE #19.
+- Lending and the Home dashboard: loans of physical copies with returns and history, per-copy loan
+  status, and an API-derived overview (FE #19; see
+  [docs/lending-dashboard-contract.md](docs/lending-dashboard-contract.md)).
 
 ## Requirements
 
@@ -82,7 +84,7 @@ BACKEND_DIR=../backend-for-tests npm run test:e2e
 
 The browser suite runs two app instances: port 3100 against a fake of the API's auth endpoints (for
 session faults such as outages, rate limits and short sessions) and port 3200 against the real API
-(every library, reading and notes journey). The real API allows 20 registrations per hour per process, so each test
+(every library, reading, notes, lending and Home journey). The real API allows 20 registrations per hour per process, so each test
 worker signs in to one reader account.
 
 First Playwright run: `npx playwright install chromium`. Integration and e2e tests expect MongoDB
