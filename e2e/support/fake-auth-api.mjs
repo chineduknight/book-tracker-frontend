@@ -16,7 +16,9 @@ import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-const port = Number(process.env.FAKE_API_PORT ?? 3901);
+// Passed by playwright.config.ts from e2e/support/ports.ts, the one place test ports are defined.
+const port = Number(process.env.FAKE_API_PORT);
+if (!Number.isInteger(port) || port <= 0) throw new Error('FAKE_API_PORT is required');
 const users = new Map(); // email -> user
 const sessions = new Map(); // id -> { email, expiresAt, revoked }
 const refreshTokens = new Map(); // token -> { sessionId, status }

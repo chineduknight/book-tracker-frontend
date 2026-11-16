@@ -1,4 +1,5 @@
 import { expect, libraryApi, test, uniqueWord } from './support/reader';
+import { BROWSER_LEAK } from './support/leaks';
 
 test('every library write refuses a foreign or missing origin', async ({ page, baseURL }) => {
   const book = await libraryApi<{ id: string }>(page, baseURL!, 'POST', '/api/library/books', {
@@ -91,7 +92,7 @@ test('no token or API address reaches the browser on library pages', async ({ pa
     await page.content(),
     JSON.stringify(await page.context().cookies()),
   ].join('\n');
-  expect(visible).not.toMatch(/127\.0\.0\.1:3002|\/api\/v1\/|Bearer |eyJ[A-Za-z0-9_-]{10,}\.eyJ/);
+  expect(visible).not.toMatch(BROWSER_LEAK);
   const session = (await page.context().cookies()).find(
     (cookie) => cookie.name === 'avuneri_session_local',
   );

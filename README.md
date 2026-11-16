@@ -35,7 +35,8 @@ cp .env.example .env.local      # then generate BFF_SESSION_ENCRYPTION_KEY as de
 npm run dev                     # http://localhost:3100
 ```
 
-The app uses port **3100** so it can run beside the API on 3000. In development, the session
+The app uses port **3100** so it can run beside the API on 3000 (set in the `dev` and `start`
+scripts, and `APP_ORIGIN` in `.env.local` must match it). In development, the session
 store's indexes are created automatically on first use.
 
 ## Configuration
@@ -82,10 +83,15 @@ BACKEND_DIR=../backend-for-tests npm run test:backend
 BACKEND_DIR=../backend-for-tests npm run test:e2e
 ```
 
-The browser suite runs two app instances: port 3100 against a fake of the API's auth endpoints (for
-session faults such as outages, rate limits and short sessions) and port 3200 against the real API
-(every library, reading, notes, lending and Home journey). The real API allows 20 registrations per hour per process, so each test
-worker signs in to one reader account.
+The browser suite runs two app instances of its own: port 3300 against a fake of the API's auth
+endpoints (for session faults such as outages, rate limits and short sessions) and port 3200 against
+the real API (every library, reading, notes, lending and Home journey), plus the fake API on 3901
+and the real API on 3002. None of them is 3100, the `npm run dev` port, so a running dev server and
+the tests never meet. All four are defined once in `e2e/support/ports.ts` and can be overridden
+with `E2E_FAKE_APP_PORT`, `E2E_REAL_APP_PORT`, `E2E_FAKE_API_PORT` and `E2E_REAL_API_PORT`.
+Playwright never reuses a server that is already running: if one of these ports is busy, the run
+fails instead of testing the wrong server. The real API allows 20 registrations per hour per
+process, so each test worker signs in to one reader account.
 
 First Playwright run: `npx playwright install chromium`. Integration and e2e tests expect MongoDB
 on `127.0.0.1:27018` (override with `BFF_SESSION_TEST_MONGODB_URI` / `E2E_SESSION_MONGODB_URI`;

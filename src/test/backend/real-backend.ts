@@ -49,7 +49,6 @@ export async function startRealBackend(options: {
         NODE_ENV: 'development',
         PORT: String(options.port),
         MONGODB_URI: `${mongoServer.replace(/\/$/, '')}/${databaseName}`,
-        CORS_ORIGIN: 'http://localhost:3100',
         LOG_LEVEL: 'warn',
         JWT_ACCESS_TOKEN_SECRET: randomBytes(32).toString('base64url'),
       },

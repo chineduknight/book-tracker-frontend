@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, libraryApi, registerFreshReader, test, uniqueWord } from './support/reader';
+import { BROWSER_LEAK } from './support/leaks';
 
 /* Lending against the real API: one copy, one active loan; explicit days; honest outcomes. */
 
@@ -338,9 +339,7 @@ test('lending is private: origin and session checks, no tokens, nothing for anot
     expect((await page.request.get(path)).headers()['cache-control']).toMatch(/no-store/);
   }
   expect(requests.filter((url) => !url.startsWith(baseURL!))).toEqual([]);
-  expect(bodies.join('\n')).not.toMatch(
-    /127\.0\.0\.1:3002|\/api\/v1\/|Bearer |eyJ[A-Za-z0-9_-]{10,}\.eyJ/,
-  );
+  expect(bodies.join('\n')).not.toMatch(BROWSER_LEAK);
   expect(await page.title()).not.toContain(secret);
 
   test.skip(isMobile, 'another reader is registered once, from the desktop project');

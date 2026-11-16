@@ -6,7 +6,7 @@ import { BffConfigError, loadBffConfig, loadSessionStoreLocation } from './confi
 const KEY = randomBytes(32).toString('base64url');
 
 const local = {
-  APP_ORIGIN: 'http://localhost:3100',
+  APP_ORIGIN: 'http://localhost:4100',
   API_BASE_URL: 'http://localhost:3000/api/v1',
   BFF_SESSION_MONGODB_URI: 'mongodb://127.0.0.1:27017/avuneri-bff',
   BFF_SESSION_ENCRYPTION_KEY: KEY,
@@ -34,7 +34,7 @@ describe('loadBffConfig', () => {
   it('accepts a loopback development configuration without https', () => {
     const config = loadBffConfig(local);
     expect(config).toMatchObject({
-      appOrigin: 'http://localhost:3100',
+      appOrigin: 'http://localhost:4100',
       isHttps: false,
       apiBaseUrl: 'http://localhost:3000/api/v1',
       sessionStore: { databaseName: 'avuneri-bff' },
