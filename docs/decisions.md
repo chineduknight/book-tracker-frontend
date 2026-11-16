@@ -134,6 +134,25 @@ Recorded in detail in [reading-notes-contract.md](reading-notes-contract.md). Th
   stored as a draft.
 - **No new dependencies.**
 
+## Lending and Home dashboard (FE #19)
+
+Recorded in detail in [lending-dashboard-contract.md](lending-dashboard-contract.md). The main
+decisions:
+
+- **A loan is a copy's event, not a book's.** Lending goes book → copy → form, so the reader always
+  picks the exact copy, and typing only starts once it is chosen (no text lost to navigation).
+- **The API decides availability.** A copy's status is fetched on request (no fan-out) and an
+  unknown status is never shown as "available"; the API's `409` settles concurrent lends.
+- **One stated reference day for "overdue".** The ledger sends one explicit `asOf` (today in UTC, the
+  API's default, unless chosen) so counts, rows and labels agree, and the page says which day it is.
+- **No retries of creates; honest unknowns.** Creating a loan is not idempotent, so an unanswered
+  request is reported as unconfirmed with a link to check, never resent.
+- **Home reads, it never computes.** Each section loads independently from the dashboard endpoints;
+  an outage is an error, never zeroes; the feed claims only creation events and shows no borrower
+  or note text.
+- **Only four browser routes**: create, copy status, edit, return. Pages read on the server, so no
+  list or dashboard route is exposed to the browser. No new dependencies.
+
 ## API transport
 
 See the README's "Backend integration" section for the interface. Choices worth recording:

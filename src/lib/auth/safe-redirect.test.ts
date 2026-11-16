@@ -80,6 +80,23 @@ describe('reading and notes return paths', () => {
   });
 });
 
+describe('lending return paths', () => {
+  const id = '665f1c2ab4e5d1a2b3c4d5e6';
+
+  it.each(['/lending/new', `/lending/${id}`, `/lending/copies/${id}`])('accepts %s', (path) => {
+    expect(safeReturnPath(path)).toBe(path);
+  });
+
+  it.each([
+    `/lending/new?copyId=${id}`,
+    `/lending/${id}/return`,
+    `/lending/copies/${id}/x`,
+    `/lending/${id.toUpperCase()}`,
+  ])('rejects %s', (path) => {
+    expect(safeReturnPath(path)).toBe('/');
+  });
+});
+
 describe('loginPathFor', () => {
   it('carries a known destination, encoded', () => {
     expect(loginPathFor('/library/wishlist')).toBe('/login?next=%2Flibrary%2Fwishlist');

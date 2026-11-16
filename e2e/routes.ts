@@ -1,6 +1,6 @@
-/** Every page in FE #15 and the heading it must show. */
+/** The primary pages and the heading each must show (Home greets the e2e reader by name). */
 export const pages = [
-  { path: '/', heading: 'Welcome to your library', title: 'Home · Avuneri', nav: 'Home' },
+  { path: '/', heading: 'Welcome back, Ada Lovelace', title: 'Home · Avuneri', nav: 'Home' },
   { path: '/library', heading: 'Library', title: 'Library · Avuneri', nav: 'Library' },
   {
     path: '/library/categories',

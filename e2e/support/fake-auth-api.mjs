@@ -7,15 +7,18 @@
 //   +shortsession  the session ends after 8 s
 //   outage@...     login drops the connection (network failure)
 //   ratelimited@   login answers 429 with Retry-After: 90
-// Every library, reading and notes endpoint answers 503, so outage handling can be tested, except
-// one healthy book (HEALTHY_BOOK_ID, with no groups), so a book page whose reading and notes
-// sections are down can be shown.
+// Every library, reading, notes, lending and dashboard endpoint answers 503, so outage handling
+// can be tested, except one healthy book (HEALTHY_BOOK_ID, with no groups), so a book page whose
+// reading and notes sections are down can be shown, and, for readers whose email contains
+// +summaryok, a healthy dashboard summary, so Home with one section up and the others down can be.
 // Test-only endpoints under /__test are served on loopback only.
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-const port = Number(process.env.FAKE_API_PORT ?? 3901);
+// Passed by playwright.config.ts from e2e/support/ports.ts, the one place test ports are defined.
+const port = Number(process.env.FAKE_API_PORT);
+if (!Number.isInteger(port) || port <= 0) throw new Error('FAKE_API_PORT is required');
 const users = new Map(); // email -> user
 const sessions = new Map(); // id -> { email, expiresAt, revoked }
 const refreshTokens = new Map(); // token -> { sessionId, status }
@@ -199,7 +202,7 @@ const routes = {
 };
 
 const LIBRARY_PATHS =
-  /^\/api\/v1\/(books|copies|locations|categories|collections|wishlist|reading-sessions|notes)(\/|$)/;
+  /^\/api\/v1\/(books|copies|locations|categories|collections|wishlist|reading-sessions|notes|loans|dashboard)(\/|$)/;
 const HEALTHY_BOOK_ID = '0000000000000000000000b0';
 const EPOCH = '2026-01-01T00:00:00.000Z';
 const EMPTY_PAGE = {
@@ -224,9 +227,41 @@ const HEALTHY = {
   '/api/v1/collections': EMPTY_PAGE,
 };
 
+const HEALTHY_SUMMARY = {
+  data: {
+    asOf: '2026-11-16',
+    catalogue: { totalBooks: 3, physicalBooks: 2, ebooks: 1, physicalCopies: 4 },
+    reading: {
+      unreadBooks: 1,
+      currentlyReadingBooks: 1,
+      completedBooks: 1,
+      booksEverCompleted: 2,
+      totalSessions: 4,
+      completedSessions: 2,
+      rereadSessions: 1,
+    },
+    notes: { notes: 5, highlights: 2 },
+    wishlist: { wanted: 2, acquired: 1 },
+    lending: { activeLoans: 2, overdueLoans: 1, returnedLoans: 3 },
+  },
+};
+
+function readerEmail(request) {
+  const presented = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+  const record = accessTokens.get(presented);
+  return record ? sessions.get(record.sessionId)?.email : undefined;
+}
+
 createServer((request, response) => {
   const path = new URL(request.url, 'http://x').pathname;
   if (request.method === 'GET' && HEALTHY[path]) return send(response, 200, HEALTHY[path]);
+  if (
+    request.method === 'GET' &&
+    path === '/api/v1/dashboard/summary' &&
+    readerEmail(request)?.includes('+summaryok')
+  ) {
+    return send(response, 200, HEALTHY_SUMMARY);
+  }
   if (LIBRARY_PATHS.test(path)) {
     return fail(
       response,

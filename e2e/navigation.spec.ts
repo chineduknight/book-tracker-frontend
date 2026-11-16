@@ -63,21 +63,26 @@ test.describe('navigating', () => {
     await expect(page).toHaveURL('/library');
   });
 
-  test('home destination cards are real links', async ({ page }) => {
+  test('home quick actions are real links', async ({ page }) => {
     await page.goto('/');
-    const cards = page.getByRole('main').getByRole('list').getByRole('link');
-    await expect(cards).toHaveText(['Library', 'Reading', 'Notes', 'Lending']);
-    await cards.filter({ hasText: 'Notes' }).click();
-    await expect(page).toHaveURL('/notes');
+    const actions = page.getByRole('navigation', { name: 'Quick actions' }).getByRole('link');
+    await expect(actions).toHaveText([
+      'Add a book',
+      'Start or continue reading',
+      'New note',
+      'Record a loan',
+      'Open the wishlist',
+    ]);
+    await actions.filter({ hasText: 'Record a loan' }).click();
+    await expect(page).toHaveURL('/lending/new');
   });
 
-  test('the unfinished tabs hold no buttons; only the account menu does', async ({ page }) => {
-    // Home and Lending have no actions yet; any button there would be a dead control.
-    for (const path of ['/', '/lending']) {
-      await page.goto(path);
-      await expect(page.getByRole('main').getByRole('button')).toHaveCount(0);
-      await expect(page.getByRole('banner').getByRole('button')).toHaveCount(1);
-    }
+  test('Home offers links, not dead buttons; only the account menu is a button', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(page.getByRole('main').getByRole('button')).toHaveCount(0);
+    await expect(page.getByRole('banner').getByRole('button')).toHaveCount(1);
   });
 });
 

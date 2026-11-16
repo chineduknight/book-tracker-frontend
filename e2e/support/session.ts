@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { FAKE_API, FAKE_APP } from './ports';
 
-export const FAKE_API = 'http://127.0.0.1:3901';
-export const APP_ORIGIN = 'http://localhost:3100';
+export { FAKE_API };
+/** The fake-API app instance these session tests run against. */
+export const APP_ORIGIN = FAKE_APP;
 export const PASSWORD = 'correct horse battery staple';
 
 /** A fresh reader per test, so parallel tests never share an account. */

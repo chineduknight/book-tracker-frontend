@@ -196,6 +196,7 @@ const NOT_FOUND_MESSAGES = new Set([
   'Wishlist item not found',
   'Reading session not found',
   'Note not found',
+  'Loan not found',
 ]);
 
 const CONFLICTS: Partial<Record<string, { code: BffErrorCode; message: string }>> = {
@@ -226,6 +227,19 @@ const CONFLICTS: Partial<Record<string, { code: BffErrorCode; message: string }>
   READING_SESSION_BOOK_MISMATCH: {
     code: 'READING_SESSION_BOOK_MISMATCH',
     message: 'That reading belongs to a different book.',
+  },
+  COPY_ALREADY_ON_LOAN: {
+    code: 'COPY_ALREADY_ON_LOAN',
+    message: 'This copy is already lent. Check its current loan before recording another.',
+  },
+  LOAN_ALREADY_RETURNED: {
+    code: 'LOAN_ALREADY_RETURNED',
+    message:
+      'This loan was returned on a different date. To correct the recorded date, edit this returned loan.',
+  },
+  LOAN_UPDATE_CONFLICT: {
+    code: 'LOAN_UPDATE_CONFLICT',
+    message: 'This loan changed elsewhere. Review the latest details before saving.',
   },
 };
 

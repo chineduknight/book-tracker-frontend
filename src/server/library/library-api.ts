@@ -107,11 +107,16 @@ export function listCopies(
   api: ApiClient,
   bookId: string,
   page: number,
+  limit = 100,
 ): Promise<Page<PhysicalCopy>> {
   return api.getPage(apiPath`/books/${bookId}/copies`, {
-    query: { page, limit: 100 },
+    query: { page, limit },
     parse: parseWith(copySchema),
   });
+}
+
+export function getCopy(api: ApiClient, copyId: string): Promise<PhysicalCopy> {
+  return api.get(apiPath`/copies/${copyId}`, { parse: parseWith(copySchema) });
 }
 
 export function createCopy(

@@ -13,7 +13,7 @@ import { createTokenVault } from '../session/token-vault';
 import { handleCurrentUser, handleLogin, handleLogout, handleRegister } from './session-handlers';
 
 const HTTPS_ORIGIN = 'https://avuneri.example';
-const LOCAL_ORIGIN = 'http://localhost:3100';
+const LOCAL_ORIGIN = 'http://localhost:4100';
 const PASSWORD = 'a long enough passphrase';
 
 let fake: FakeBackendAuth;

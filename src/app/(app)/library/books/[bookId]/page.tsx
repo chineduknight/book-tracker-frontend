@@ -98,8 +98,8 @@ export default async function BookPage({
           redirectTo="/library?notice=book-deleted"
         >
           It will disappear from your library, its categories and collections, and searches. Its
-          copies are hidden with it. Avuneri keeps the record for your reading and lending history;
-          there is no way to restore it from here.
+          copies are hidden with it. Loans of its copies stay in Lending, where any still out can be
+          returned. There is no way to restore the book from here.
         </DeleteButton>
       </div>
 

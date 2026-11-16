@@ -37,6 +37,18 @@ export function describeBffError(error: BffError): { title: string; detail: stri
         title: error.message,
         detail: 'Choose a reading of this book, or save the note without one. Nothing was saved.',
       };
+    case 'COPY_ALREADY_ON_LOAN':
+      return { title: error.message, detail: 'Nothing was recorded. Your text is still here.' };
+    case 'LOAN_ALREADY_RETURNED':
+      return {
+        title: error.message,
+        detail: 'Nothing was changed. Reload to see the recorded date.',
+      };
+    case 'LOAN_UPDATE_CONFLICT':
+      return {
+        title: error.message,
+        detail: 'Your changes weren’t saved but are still here. Reload in another tab to compare.',
+      };
     case 'PAYLOAD_TOO_LARGE':
       return {
         title: 'This is too large to save.',

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, libraryApi, registerFreshReader, test, uniqueWord } from './support/reader';
+import { BROWSER_LEAK } from './support/leaks';
 
 /* Notes and highlights against the real API: safe display, search, privacy and long text. */
 
@@ -283,7 +284,7 @@ test('private: no tokens or API calls in the browser, and nothing visible to ano
   }
   expect(requests.filter((url) => !url.startsWith(baseURL!))).toEqual([]);
   const visible = [...bodies, JSON.stringify(await page.context().cookies())].join('\n');
-  expect(visible).not.toMatch(/127\.0\.0\.1:3002|\/api\/v1\/|Bearer |eyJ[A-Za-z0-9_-]{10,}\.eyJ/);
+  expect(visible).not.toMatch(BROWSER_LEAK);
   for (const path of ['/reading', '/notes']) {
     expect((await page.request.get(path)).headers()['cache-control']).toMatch(/no-store/);
   }

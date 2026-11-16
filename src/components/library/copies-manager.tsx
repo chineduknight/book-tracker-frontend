@@ -18,13 +18,17 @@ import {
   type CopyField,
   type CopyFormValues,
 } from '@/lib/library/copy-form';
+import { copyAddedOn, copyName } from '@/lib/library/copy-name';
 import { hasErrors, type FieldErrors } from '@/lib/library/form-values';
 import { CONDITION_LABELS, COPY_CONDITIONS, LIMITS } from '@/lib/library/rules';
 import type { PhysicalCopy, StorageLocation } from '@/lib/library/types';
+import { CopyLoanStatus } from '@/components/lending/copy-loan-status';
 import { ActionError } from './action-error';
 import { DeleteButton } from './delete-button';
 import { useBffAction } from './use-bff-action';
 import { useFocusFirstInvalid } from './use-focus-first-invalid';
+
+export { copyAddedOn, copyName, copyReference } from '@/lib/library/copy-name';
 
 interface CopiesManagerProps {
   bookId: string;
@@ -32,28 +36,7 @@ interface CopiesManagerProps {
   locations: StorageLocation[];
 }
 
-const ADDED_DATE = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
-
-/**
- * A permanent short reference for a copy: the end of its API id, where a MongoDB ObjectId keeps its
- * per-insert counter, so copies added in the same second still differ. Never the list position,
- * which shifts whenever a copy is added.
- */
-export function copyReference(copy: PhysicalCopy): string {
-  return `#${copy.id.slice(-6)}`;
-}
-
-/** The copy's name everywhere it is acted on: rows, Edit and Delete labels, dialogs. */
-export function copyName(copy: PhysicalCopy): string {
-  return `${copy.label ?? 'Unlabelled copy'} ${copyReference(copy)}`;
-}
-
-/** When the copy was recorded (UTC, so the server and the browser render it identically). */
-export function copyAddedOn(copy: PhysicalCopy): string {
-  return ADDED_DATE.format(new Date(copy.createdAt));
-}
-
-/** The physical copies of one physical book. Lending status arrives with the lending milestone. */
+/** The physical copies of one physical book, each with an on-demand loan status. */
 export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -95,6 +78,9 @@ export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps)
                         {copy.storageNote}
                       </p>
                     ) : null}
+                    <div className="mt-3">
+                      <CopyLoanStatus copyId={copy.id} copyLabel={copyName(copy)} />
+                    </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     <Button variant="secondary" onClick={() => setEditingId(copy.id)}>
@@ -106,8 +92,9 @@ export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps)
                       label="Delete copy"
                       title={`Delete ${copyName(copy)}?`}
                     >
-                      This copy will disappear from your library. Avuneri keeps its record for
-                      lending history; there is no way to restore it from here.
+                      This copy will disappear from your library. Its loans, including one that is
+                      still out, stay in Lending, where they can still be returned. There is no way
+                      to restore the copy from here.
                     </DeleteButton>
                   </div>
                 </div>
