@@ -24,5 +24,6 @@ export default defineConfig([
     'test-results/**',
     'blob-report/**',
     'next-env.d.ts',
+    '.ci/**',
   ]),
 ]);

@@ -34,3 +34,6 @@ npm-debug.log*
 
 # Playwright visual walkthrough (published as a CI artifact)
 screenshots/
+
+# CI-only checkout of book-tracker-backend
+.ci/

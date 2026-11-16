@@ -35,18 +35,19 @@ jobs:
       BFF_SESSION_TEST_MONGODB_URI: mongodb://127.0.0.1:27018
       BACKEND_TEST_MONGODB_URI: mongodb://127.0.0.1:27018
       E2E_SESSION_MONGODB_URI: mongodb://127.0.0.1:27018/avuneri-bff-e2e
-      BACKEND_DIR: ${{ github.workspace }}/backend
+      BACKEND_DIR: ${{ github.workspace }}/.ci/book-tracker-backend
     steps:
       - uses: actions/checkout@v7
 
-      # The merged API the library contract was written against, pinned to an exact commit.
+      # The merged API the library contract was written against, pinned to an exact commit. It lives
+      # under .ci/, which typecheck, lint, format and git all ignore.
       # Bump deliberately when the API changes (see README → Real-backend tests).
       - name: Check out book-tracker-backend (pinned)
         uses: actions/checkout@v7
         with:
           repository: chineduknight/book-tracker-backend
           ref: fea9c12e218f0322714f3e1c3139e494cbf90204
-          path: backend
+          path: .ci/book-tracker-backend
           persist-credentials: false
 
       - uses: actions/setup-node@v7
@@ -55,13 +56,13 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            backend/package-lock.json
+            .ci/book-tracker-backend/package-lock.json
 
       - run: npm ci
 
       - name: Install the API's dependencies
         run: npm ci
-        working-directory: backend
+        working-directory: .ci/book-tracker-backend
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
