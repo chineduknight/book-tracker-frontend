@@ -44,6 +44,11 @@ export interface LibraryOperation<Input, Result, IdName extends string = never> 
     request: { ids: Readonly<Record<IdName, string>>; input: Input },
   ) => Promise<Result>;
   successStatus?: 200 | 201;
+  /**
+   * The JSON body cap for this operation, enforced on the streamed bytes and again on the body
+   * forwarded to the API. Library writes use 32 KiB; note writes use the API's own 100 kB.
+   */
+  maxBodyBytes?: number;
 }
 
 export interface RouteContext {
@@ -79,7 +84,7 @@ export async function handleLibraryOperation<Input, Result, IdName extends strin
     const rejected = rejectUnsafeMutation(
       request,
       runtime.config.appOrigin,
-      operation.body ? { kind: 'json', maxBytes: MAX_LIBRARY_REQUEST_BYTES } : { kind: 'none' },
+      operation.body ? { kind: 'json', maxBytes: bodyLimitOf(operation) } : { kind: 'none' },
     );
     if (rejected) return rejected;
   }
@@ -112,6 +117,10 @@ export async function handleLibraryOperation<Input, Result, IdName extends strin
     : dataResponse(result, operation.successStatus ?? 200);
 }
 
+function bodyLimitOf(operation: { maxBodyBytes?: number }): number {
+  return operation.maxBodyBytes ?? MAX_LIBRARY_REQUEST_BYTES;
+}
+
 export function readerApiClient(runtime: BffRuntime, accessToken: string): ApiClient {
   return createApiClient({ baseUrl: runtime.config.apiBaseUrl, getAccessToken: () => accessToken });
 }
@@ -133,17 +142,35 @@ async function readInput<Input, Result, IdName extends string>(
       : errorResponse(400, { code: 'VALIDATION_ERROR', message: 'This request takes no body.' });
   }
 
-  const body = await readJsonBody(request, MAX_LIBRARY_REQUEST_BYTES);
+  const maxBytes = bodyLimitOf(operation);
+  const body = await readJsonBody(request, maxBytes);
   if (isErrorResponse(body)) return body;
   const parsed = operation.body.safeParse(body);
-  if (parsed.success) return parsed.data;
-  return validationFailed(
-    parsed.error.issues.map((issue) => ({
-      field: typeof issue.path[0] === 'string' ? issue.path[0] : 'body',
-      message: issue.code === 'unrecognized_keys' ? 'contains an unknown field' : issue.message,
-    })),
-  );
+  if (!parsed.success) {
+    return validationFailed(
+      parsed.error.issues.map((issue) => ({
+        field: fieldNameOf(issue.path),
+        message: issue.code === 'unrecognized_keys' ? 'contains an unknown field' : issue.message,
+      })),
+    );
+  }
+  // The API counts the bytes it receives, which the BFF re-serialises: check those too.
+  if (Buffer.byteLength(JSON.stringify(parsed.data), 'utf8') > maxBytes) {
+    return errorResponse(413, PAYLOAD_TOO_LARGE);
+  }
+  return parsed.data;
 }
+
+/** `progress.value` for nested fields; array positions are dropped (`authors.3` → `authors`). */
+function fieldNameOf(path: readonly PropertyKey[]): string {
+  const names = path.filter((part): part is string => typeof part === 'string');
+  return names.length > 0 ? names.join('.') : 'body';
+}
+
+const PAYLOAD_TOO_LARGE: BffError = {
+  code: 'PAYLOAD_TOO_LARGE',
+  message: 'The request is too large.',
+};
 
 function validationFailed(fields: BffFieldError[]): NextResponse {
   return errorResponse(400, {
@@ -167,6 +194,8 @@ const NOT_FOUND_MESSAGES = new Set([
   'Category not found',
   'Collection not found',
   'Wishlist item not found',
+  'Reading session not found',
+  'Note not found',
 ]);
 
 const CONFLICTS: Partial<Record<string, { code: BffErrorCode; message: string }>> = {
@@ -181,6 +210,22 @@ const CONFLICTS: Partial<Record<string, { code: BffErrorCode; message: string }>
   WISHLIST_ALREADY_ACQUIRED: {
     code: 'WISHLIST_ALREADY_ACQUIRED',
     message: 'This wish was already acquired with a different book.',
+  },
+  READING_SESSION_IN_PROGRESS: {
+    code: 'READING_SESSION_IN_PROGRESS',
+    message: 'You’re already reading this book.',
+  },
+  INVALID_READING_TRANSITION: {
+    code: 'INVALID_READING_TRANSITION',
+    message: 'A finished reading can’t be reopened. Start a new reading to reread the book.',
+  },
+  READING_SESSION_UPDATE_CONFLICT: {
+    code: 'READING_SESSION_UPDATE_CONFLICT',
+    message: 'This reading was being changed somewhere else at the same time.',
+  },
+  READING_SESSION_BOOK_MISMATCH: {
+    code: 'READING_SESSION_BOOK_MISMATCH',
+    message: 'That reading belongs to a different book.',
   },
 };
 
@@ -220,6 +265,8 @@ function apiErrorResponse(error: ApiError): NextResponse {
           : 'This conflicts with something that already exists.',
       });
     }
+    case 413:
+      return errorResponse(413, PAYLOAD_TOO_LARGE);
     case 429:
       return rateLimited(error.retryAfterSeconds);
     default:

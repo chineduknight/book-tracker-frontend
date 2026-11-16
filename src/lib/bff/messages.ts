@@ -20,7 +20,28 @@ export function describeBffError(error: BffError): { title: string; detail: stri
     case 'BOOK_HAS_PHYSICAL_COPIES':
     case 'BOOK_NOT_PHYSICAL':
     case 'WISHLIST_ALREADY_ACQUIRED':
+    case 'INVALID_READING_TRANSITION':
       return { title: error.message, detail: 'Nothing was changed.' };
+    case 'READING_SESSION_IN_PROGRESS':
+      return {
+        title: error.message,
+        detail: 'A book has one reading in progress at a time. Continue it, or finish it first.',
+      };
+    case 'READING_SESSION_UPDATE_CONFLICT':
+      return {
+        title: error.message,
+        detail: 'Your changes weren’t saved but are still here. Save again to retry.',
+      };
+    case 'READING_SESSION_BOOK_MISMATCH':
+      return {
+        title: error.message,
+        detail: 'Choose a reading of this book, or save the note without one. Nothing was saved.',
+      };
+    case 'PAYLOAD_TOO_LARGE':
+      return {
+        title: 'This is too large to save.',
+        detail: 'Shorten it and try again. Your text is still here.',
+      };
     case 'RATE_LIMITED':
       return { title: 'Too many requests.', detail: waitDescription(error.retryAfterSeconds) };
     case 'SERVICE_UNAVAILABLE':
