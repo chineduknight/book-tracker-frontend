@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { readFormValues } from '@/lib/forms/read-form-values';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { hasErrors, type FieldErrors } from '@/lib/library/form-values';
@@ -35,9 +36,7 @@ export function NamedItemForm({ noun, path, item, suggestions = [], onDone }: Na
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
-  const [values, setValues] = useState<NamedFormValues>(
-    item ? namedFormValuesOf(item) : EMPTY_NAMED_FORM,
-  );
+  const initial: NamedFormValues = item ? namedFormValuesOf(item) : EMPTY_NAMED_FORM;
   const [errors, setErrors] = useState<FieldErrors<NamedField>>({});
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState('');
@@ -49,13 +48,14 @@ export function NamedItemForm({ noun, path, item, suggestions = [], onDone }: Na
     event.preventDefault();
     if (isPending) return;
     setStatus('');
-    const problems = validateNamedForm(values);
+    const shown = readFormValues(event.currentTarget, initial);
+    const problems = validateNamedForm(shown);
     setErrors(problems);
     if (hasErrors(problems)) {
       setAttempt((count) => count + 1);
       return;
     }
-    const body = isEdit ? namedChanges(item, values) : newNamedPayload(values);
+    const body = isEdit ? namedChanges(item, shown) : newNamedPayload(shown);
     if (isEdit && Object.keys(body).length === 0) {
       setStatus('No changes to save.');
       return;
@@ -74,7 +74,7 @@ export function NamedItemForm({ noun, path, item, suggestions = [], onDone }: Na
       return;
     }
     setStatus(isEdit ? 'Saved.' : `The ${noun} was created.`);
-    if (!isEdit) setValues(EMPTY_NAMED_FORM);
+    if (!isEdit) formRef.current?.reset();
     router.refresh();
     onDone?.();
   }
@@ -93,9 +93,8 @@ export function NamedItemForm({ noun, path, item, suggestions = [], onDone }: Na
         name="name"
         maxLength={LIMITS.name}
         required
-        value={values.name}
+        defaultValue={initial.name}
         error={errors.name}
-        onChange={(event) => setValues({ ...values, name: event.target.value })}
       />
       {suggestions.length > 0 ? (
         <div>
@@ -108,7 +107,10 @@ export function NamedItemForm({ noun, path, item, suggestions = [], onDone }: Na
                 key={suggestion}
                 variant="secondary"
                 className="min-h-9 px-3 py-1 text-xs"
-                onClick={() => setValues({ ...values, name: suggestion })}
+                onClick={() => {
+                  const name = formRef.current?.elements.namedItem('name');
+                  if (name instanceof HTMLInputElement) name.value = suggestion;
+                }}
               >
                 {suggestion}
               </Button>
@@ -121,9 +123,8 @@ export function NamedItemForm({ noun, path, item, suggestions = [], onDone }: Na
         name="description"
         maxLength={LIMITS.groupDescription}
         rows={2}
-        value={values.description}
+        defaultValue={initial.description}
         error={errors.description}
-        onChange={(event) => setValues({ ...values, description: event.target.value })}
       />
       <div className="flex flex-wrap gap-3">
         <Button type="submit" aria-disabled={isPending}>

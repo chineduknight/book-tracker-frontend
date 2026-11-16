@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { readFormValues } from '@/lib/forms/read-form-values';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +32,16 @@ interface CopiesManagerProps {
   locations: StorageLocation[];
 }
 
+const ADDED_DATE = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
+
+/**
+ * A name that stays the same however many copies are added: the reader's label, or when the copy
+ * was recorded (UTC, so the server and the browser render it identically).
+ */
+export function copyName(copy: PhysicalCopy): string {
+  return copy.label ?? `Unlabelled copy added ${ADDED_DATE.format(new Date(copy.createdAt))}`;
+}
+
 /** The physical copies of one physical book. Lending status arrives with the lending milestone. */
 export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
@@ -46,7 +57,7 @@ export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps)
         <p className="text-sm text-ink-muted">No copies recorded yet.</p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {copies.map((copy, index) => (
+          {copies.map((copy) => (
             <li key={copy.id} className="rounded-xl border border-line bg-surface p-4">
               {editingId === copy.id ? (
                 <CopyForm
@@ -58,9 +69,7 @@ export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps)
               ) : (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="font-medium break-words text-ink">
-                      {copy.label ?? `Copy ${index + 1}`}
-                    </p>
+                    <p className="font-medium break-words text-ink">{copyName(copy)}</p>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <Badge>
                         {copy.condition
@@ -78,12 +87,12 @@ export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps)
                   <div className="flex shrink-0 flex-wrap gap-2">
                     <Button variant="secondary" onClick={() => setEditingId(copy.id)}>
                       <Pencil aria-hidden="true" className="size-4" />
-                      Edit<span className="sr-only"> {copy.label ?? `copy ${index + 1}`}</span>
+                      Edit<span className="sr-only"> {copyName(copy)}</span>
                     </Button>
                     <DeleteButton
                       path={`/api/library/copies/${copy.id}`}
                       label="Delete copy"
-                      title={`Delete ${copy.label ?? `copy ${index + 1}`}?`}
+                      title={`Delete ${copyName(copy)}?`}
                     >
                       This copy will disappear from your library. Avuneri keeps its record for
                       lending history; there is no way to restore it from here.
@@ -126,9 +135,7 @@ function CopyForm({
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
-  const [values, setValues] = useState<CopyFormValues>(
-    copy ? copyFormValuesOf(copy) : EMPTY_COPY_FORM,
-  );
+  const initial: CopyFormValues = copy ? copyFormValuesOf(copy) : EMPTY_COPY_FORM;
   const [errors, setErrors] = useState<FieldErrors<CopyField>>({});
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState('');
@@ -138,13 +145,14 @@ function CopyForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isPending) return;
-    const problems = validateCopyForm(values);
+    const shown = readFormValues(event.currentTarget, initial);
+    const problems = validateCopyForm(shown);
     setErrors(problems);
     if (hasErrors(problems)) {
       setAttempt((count) => count + 1);
       return;
     }
-    const body = copy ? copyChanges(copy, values) : newCopyPayload(values);
+    const body = copy ? copyChanges(copy, shown) : newCopyPayload(shown);
     if (copy && Object.keys(body).length === 0) {
       setStatus('No changes to save.');
       return;
@@ -175,19 +183,13 @@ function CopyForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <Input
           label="Label (optional)"
+          name="label"
           hint="To tell copies apart, e.g. “Signed hardback”."
           maxLength={LIMITS.copyLabel}
-          value={values.label}
+          defaultValue={initial.label}
           error={errors.label}
-          onChange={(event) => setValues({ ...values, label: event.target.value })}
         />
-        <Select
-          label="Condition"
-          value={values.condition}
-          onChange={(event) =>
-            setValues({ ...values, condition: event.target.value as CopyFormValues['condition'] })
-          }
-        >
+        <Select label="Condition" name="condition" defaultValue={initial.condition}>
           <option value="">Not assessed</option>
           {COPY_CONDITIONS.map((condition) => (
             <option key={condition} value={condition}>
@@ -197,9 +199,9 @@ function CopyForm({
         </Select>
         <Select
           label="Location"
+          name="locationId"
           hint={locations.length === 0 ? 'Add locations under Library → Locations.' : undefined}
-          value={values.locationId}
-          onChange={(event) => setValues({ ...values, locationId: event.target.value })}
+          defaultValue={initial.locationId}
         >
           <option value="">Unassigned</option>
           {locations.map((location) => (
@@ -211,11 +213,11 @@ function CopyForm({
       </div>
       <Textarea
         label="Storage note (optional)"
+        name="storageNote"
         rows={2}
         maxLength={LIMITS.storageNote}
-        value={values.storageNote}
+        defaultValue={initial.storageNote}
         error={errors.storageNote}
-        onChange={(event) => setValues({ ...values, storageNote: event.target.value })}
       />
       <div className="flex flex-wrap gap-3">
         <Button type="submit" aria-disabled={isPending}>

@@ -15,6 +15,7 @@ import {
   type BookField,
   type BookFormValues,
 } from '@/lib/library/book-form';
+import { readFormValues } from '@/lib/forms/read-form-values';
 import { hasErrors, type FieldErrors } from '@/lib/library/form-values';
 import { BOOK_FORMATS, FORMAT_LABELS, LIMITS } from '@/lib/library/rules';
 import type { Book } from '@/lib/library/types';
@@ -30,24 +31,32 @@ export function BookForm({ book }: { book?: Book }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
-  const [values, setValues] = useState<BookFormValues>(
-    book ? bookFormValuesOf(book) : EMPTY_BOOK_FORM,
-  );
+  const initial = book ? bookFormValuesOf(book) : EMPTY_BOOK_FORM;
+  const [probe, setProbe] = useState({ title: initial.title, isbn: initial.isbn });
+  const [selectedFormat, setSelectedFormat] = useState(initial.format);
   const [errors, setErrors] = useState<FieldErrors<BookField>>({});
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState('');
   const { send, isPending, error, setError } = useBffAction();
   useFocusFirstInvalid(formRef, attempt, errorRef);
 
-  const update = (field: BookField, value: string) => {
-    setValues((current) => ({ ...current, [field]: value }));
+  /** Fields are uncontrolled (see SignInForm); this only tracks what live UI needs. */
+  function noteChange(event: FormEvent<HTMLFormElement>) {
+    const changed: EventTarget = event.target;
+    if (!(changed instanceof HTMLInputElement || changed instanceof HTMLTextAreaElement)) return;
+    const field = FIELDS.find((name) => name === changed.name);
+    if (!field) return;
     if (errors[field]) setErrors((current) => ({ ...current, [field]: undefined }));
-  };
+    if (field === 'title' || field === 'isbn')
+      setProbe((current) => ({ ...current, [field]: changed.value }));
+    if (field === 'format') setSelectedFormat(changed.value as BookFormValues['format']);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isPending) return;
     setStatus('');
+    const values = readFormValues(event.currentTarget, initial);
     const problems = validateBookForm(values);
     setErrors(problems);
     if (hasErrors(problems)) {
@@ -90,6 +99,7 @@ export function BookForm({ book }: { book?: Book }) {
       ref={formRef}
       noValidate
       onSubmit={submit}
+      onChange={noteChange}
       aria-busy={isPending}
       className="flex flex-col gap-5"
     >
@@ -99,18 +109,16 @@ export function BookForm({ book }: { book?: Book }) {
         name="title"
         required
         maxLength={LIMITS.title}
-        value={values.title}
+        defaultValue={initial.title}
         error={errors.title}
-        onChange={(event) => update('title', event.target.value)}
       />
       <Textarea
         label="Authors (optional)"
         hint="One author per line, up to 20."
         name="authors"
         rows={2}
-        value={values.authors}
+        defaultValue={initial.authors}
         error={errors.authors}
-        onChange={(event) => update('authors', event.target.value)}
       />
       <fieldset
         className="flex flex-col gap-2"
@@ -127,9 +135,8 @@ export function BookForm({ book }: { book?: Book }) {
                 type="radio"
                 name="format"
                 value={format}
-                checked={values.format === format}
-                data-invalid={errors.format ? 'true' : undefined}
-                onChange={() => update('format', format)}
+                defaultChecked={initial.format === format}
+                data-invalid={errors.format && selectedFormat === format ? 'true' : undefined}
                 className="size-4 accent-[var(--accent)]"
               />
               {FORMAT_LABELS[format]}
@@ -145,7 +152,10 @@ export function BookForm({ book }: { book?: Book }) {
                   variant="secondary"
                   className="min-h-9 text-xs"
                   onClick={() => {
-                    update('format', 'physical');
+                    const formats = formRef.current?.elements.namedItem('format');
+                    if (formats instanceof RadioNodeList) formats.value = 'physical';
+                    setSelectedFormat('physical');
+                    setErrors((current) => ({ ...current, format: undefined }));
                     setError(null);
                   }}
                 >
@@ -161,41 +171,36 @@ export function BookForm({ book }: { book?: Book }) {
           label="ISBN (optional)"
           name="isbn"
           maxLength={LIMITS.isbn}
-          value={values.isbn}
+          defaultValue={initial.isbn}
           error={errors.isbn}
-          onChange={(event) => update('isbn', event.target.value)}
         />
         <Input
           label="Edition (optional)"
           name="edition"
           maxLength={LIMITS.edition}
-          value={values.edition}
+          defaultValue={initial.edition}
           error={errors.edition}
-          onChange={(event) => update('edition', event.target.value)}
         />
         <Input
           label="Publication year (optional)"
           name="publicationYear"
           inputMode="numeric"
-          value={values.publicationYear}
+          defaultValue={initial.publicationYear}
           error={errors.publicationYear}
-          onChange={(event) => update('publicationYear', event.target.value)}
         />
         <Input
           label="Pages (optional)"
           name="pageCount"
           inputMode="numeric"
-          value={values.pageCount}
+          defaultValue={initial.pageCount}
           error={errors.pageCount}
-          onChange={(event) => update('pageCount', event.target.value)}
         />
         <Input
           label="Chapters (optional)"
           name="chapterCount"
           inputMode="numeric"
-          value={values.chapterCount}
+          defaultValue={initial.chapterCount}
           error={errors.chapterCount}
-          onChange={(event) => update('chapterCount', event.target.value)}
         />
         <Input
           label="Cover image address (optional)"
@@ -204,9 +209,8 @@ export function BookForm({ book }: { book?: Book }) {
           type="url"
           inputMode="url"
           maxLength={LIMITS.url}
-          value={values.coverUrl}
+          defaultValue={initial.coverUrl}
           error={errors.coverUrl}
-          onChange={(event) => update('coverUrl', event.target.value)}
         />
       </div>
       <Textarea
@@ -214,13 +218,12 @@ export function BookForm({ book }: { book?: Book }) {
         name="description"
         rows={5}
         maxLength={LIMITS.description}
-        value={values.description}
+        defaultValue={initial.description}
         error={errors.description}
-        onChange={(event) => update('description', event.target.value)}
       />
       <DuplicateSuggestions
-        title={values.title}
-        isbn={values.isbn}
+        title={probe.title}
+        isbn={probe.isbn}
         {...(book ? { excludeBookId: book.id } : {})}
       />
       <div className="flex flex-wrap gap-3">

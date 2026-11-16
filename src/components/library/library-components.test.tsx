@@ -1,0 +1,146 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Book, PhysicalCopy } from '@/lib/library/types';
+import { BookForm } from './book-form';
+import { copyName } from './copies-manager';
+
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
+const navigation = vi.hoisted(() => ({ navigateTo: vi.fn(), replaceWith: vi.fn() }));
+vi.mock('@/lib/navigation/hard-navigation', () => navigation);
+
+const NOW = '2026-11-15T10:00:00.000Z';
+const book: Book = {
+  id: '665f1c2ab4e5d1a2b3c4d5e6',
+  title: 'Middlemarch',
+  authors: ['George Eliot'],
+  format: 'physical',
+  isbn: '9780141439549',
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let fetchMock: ReturnType<typeof vi.fn>;
+beforeEach(() => {
+  fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+  router.push.mockReset();
+  navigation.navigateTo.mockReset();
+});
+afterEach(() => vi.unstubAllGlobals());
+
+const writes = () => fetchMock.mock.calls.filter(([, init]) => init?.method !== 'GET');
+
+describe('BookForm', () => {
+  it('creates with only filled fields and opens the new book', async () => {
+    fetchMock.mockResolvedValue(json(201, { data: { ...book, id: 'a'.repeat(24) } }));
+    const user = userEvent.setup();
+    render(<BookForm />);
+    await user.type(screen.getByLabelText('Title'), '  The   Waves ');
+    await user.click(screen.getByRole('radio', { name: 'Ebook' }));
+    await user.click(screen.getByRole('button', { name: 'Add book' }));
+
+    await waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith(
+        `/library/books/${'a'.repeat(24)}?notice=book-created`,
+      ),
+    );
+    const [url, init] = writes()[0]!;
+    expect(url).toBe('/api/library/books');
+    expect(JSON.parse(init.body)).toEqual({ title: 'The Waves', format: 'ebook' });
+  });
+
+  it('keeps text typed before the page became interactive', async () => {
+    fetchMock.mockResolvedValue(json(201, { data: { ...book, id: 'c'.repeat(24) } }));
+    render(<BookForm />);
+    (screen.getByLabelText('Title') as HTMLInputElement).value = 'Typed early';
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Add book' }));
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    expect(JSON.parse(writes()[0]![1].body)).toEqual({ title: 'Typed early', format: 'physical' });
+  });
+
+  it('sends nothing when nothing changed', async () => {
+    const user = userEvent.setup();
+    render(<BookForm book={book} />);
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(screen.getByRole('status')).toHaveTextContent('No changes to save.');
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('clears a field with null and keeps edits through a format conflict', async () => {
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PATCH'
+        ? json(409, {
+            error: {
+              code: 'BOOK_HAS_PHYSICAL_COPIES',
+              message: 'This book has (or once had) physical copies, so it cannot become an ebook.',
+            },
+          })
+        : json(200, { data: [] }),
+    );
+    const user = userEvent.setup();
+    render(<BookForm book={book} />);
+    await user.clear(screen.getByLabelText('ISBN (optional)'));
+    await user.type(screen.getByLabelText('Edition (optional)'), 'Penguin');
+    await user.click(screen.getByRole('radio', { name: 'Ebook' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText(/cannot become an ebook/)).toBeVisible();
+    expect(JSON.parse(writes()[0]![1].body)).toEqual({
+      format: 'ebook',
+      isbn: null,
+      edition: 'Penguin',
+    });
+    expect(screen.getByRole('radio', { name: 'Ebook' })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: /Keep it physical/ }));
+    expect(screen.getByRole('radio', { name: 'Physical' })).toBeChecked();
+    expect(screen.getByLabelText('Edition (optional)')).toHaveValue('Penguin');
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('shows field errors from validation without calling the BFF', async () => {
+    const user = userEvent.setup();
+    render(<BookForm />);
+    await user.type(screen.getByLabelText('Pages (optional)'), 'many');
+    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    expect(screen.getByLabelText('Title')).toHaveFocus();
+    expect(screen.getByLabelText('Pages (optional)')).toHaveAccessibleDescription(/whole number/);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('sends an ended session to sign-in', async () => {
+    window.history.replaceState(null, '', '/library/new');
+    fetchMock.mockResolvedValue(json(401, { error: { code: 'UNAUTHENTICATED', message: 'x' } }));
+    const user = userEvent.setup();
+    render(<BookForm />);
+    await user.type(screen.getByLabelText('Title'), 'Late');
+    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await waitFor(() =>
+      expect(navigation.navigateTo).toHaveBeenCalledWith('/login?next=%2Flibrary%2Fnew'),
+    );
+  });
+});
+
+describe('copyName', () => {
+  const copy: PhysicalCopy = {
+    id: 'b'.repeat(24),
+    bookId: book.id,
+    locationId: null,
+    createdAt: '2026-11-15T23:30:00.000Z',
+    updatedAt: NOW,
+  };
+
+  it('uses the label, or a stable added date (UTC) that does not depend on list position', () => {
+    expect(copyName({ ...copy, label: 'Signed' })).toBe('Signed');
+    expect(copyName(copy)).toBe('Unlabelled copy added 15 Nov 2026');
+  });
+});
