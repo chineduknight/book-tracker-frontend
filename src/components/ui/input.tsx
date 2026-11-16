@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 type InputProps = Omit<ComponentProps<'input'>, 'id'> & {
   /** Visible label. Inputs are never labelled by placeholder alone. */
   label: string;
-  hint?: string;
+  hint?: string | undefined;
   error?: string | undefined;
   id?: string;
   /** A control placed inside the field's end, such as a show-password toggle. */

@@ -17,26 +17,8 @@ export interface SignedInProfile {
 
 export type BackendSignOut = 'confirmed' | 'unconfirmed' | 'not-needed';
 
-export type SessionApiErrorCode =
-  | 'VALIDATION_ERROR'
-  | 'INVALID_CREDENTIALS'
-  | 'EMAIL_TAKEN'
-  | 'RATE_LIMITED'
-  | 'UNAUTHENTICATED'
-  | 'SERVICE_UNAVAILABLE'
-  | 'FORBIDDEN_ORIGIN'
-  | 'UNSUPPORTED_MEDIA_TYPE'
-  | 'PAYLOAD_TOO_LARGE'
-  | 'INVALID_JSON';
-
-export interface SessionApiFieldError {
-  field: string;
-  message: string;
-}
-
-export interface SessionApiError {
-  code: SessionApiErrorCode;
-  message: string;
-  fields?: SessionApiFieldError[];
-  retryAfterSeconds?: number;
-}
+export type {
+  BffError as SessionApiError,
+  BffErrorCode as SessionApiErrorCode,
+  BffFieldError as SessionApiFieldError,
+} from '@/lib/bff/errors';

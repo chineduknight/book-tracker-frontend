@@ -19,7 +19,7 @@ jobs:
   verify:
     name: Typecheck, lint, test, build, browser tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     services:
       # Disposable store for the BFF session integration and browser tests. Nothing else uses it.
       mongodb:
@@ -33,16 +33,36 @@ jobs:
           --health-retries 20
     env:
       BFF_SESSION_TEST_MONGODB_URI: mongodb://127.0.0.1:27018
+      BACKEND_TEST_MONGODB_URI: mongodb://127.0.0.1:27018
       E2E_SESSION_MONGODB_URI: mongodb://127.0.0.1:27018/avuneri-bff-e2e
+      BACKEND_DIR: ${{ github.workspace }}/.ci/book-tracker-backend
     steps:
       - uses: actions/checkout@v7
+
+      # The merged API the library contract was written against, pinned to an exact commit. It lives
+      # under .ci/, which typecheck, lint, format and git all ignore.
+      # Bump deliberately when the API changes (see README → Real-backend tests).
+      - name: Check out book-tracker-backend (pinned)
+        uses: actions/checkout@v7
+        with:
+          repository: chineduknight/book-tracker-backend
+          ref: fea9c12e218f0322714f3e1c3139e494cbf90204
+          path: .ci/book-tracker-backend
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc # Node 26.x
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            .ci/book-tracker-backend/package-lock.json
 
       - run: npm ci
+
+      - name: Install the API's dependencies
+        run: npm ci
+        working-directory: .ci/book-tracker-backend
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
@@ -50,6 +70,9 @@ jobs:
 
       - name: Session store integration tests (MongoDB 8)
         run: npm run test:integration
+
+      - name: Library contract tests against the real API (MongoDB 8)
+        run: npm run test:backend
 
       - name: Colour contrast of the design tokens
         run: npm run check:contrast
@@ -68,7 +91,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Browser tests (mobile and desktop Chromium, fake auth API, MongoDB 8)
+      - name: Browser tests (mobile and desktop Chromium; real API and fake auth API; MongoDB 8)
         run: npm run test:e2e
 
       - name: Upload visual walkthrough

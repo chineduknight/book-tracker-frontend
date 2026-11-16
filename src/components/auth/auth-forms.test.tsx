@@ -129,6 +129,23 @@ describe('SignInForm', () => {
     expect(alert).not.toHaveTextContent('incorrect');
   });
 
+  it('keeps text typed before the page became interactive', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { data: { user: { name: 'Ada', email: 'a' } } }));
+    render(<SignInForm returnPath="/" />);
+    // Text typed before hydration is in the DOM but not in React state: set it without events.
+    (screen.getByLabelText('Email') as HTMLInputElement).value = 'early@example.test';
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Password'), 'secret passphrase');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => expect(navigation.navigateTo).toHaveBeenCalledWith('/'));
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({
+      email: 'early@example.test',
+      password: 'secret passphrase',
+    });
+    expect(screen.getByLabelText('Email')).toHaveValue('early@example.test');
+  });
+
   it('lets the password be shown and hidden', async () => {
     render(<SignInForm returnPath="/" />);
     const user = userEvent.setup();

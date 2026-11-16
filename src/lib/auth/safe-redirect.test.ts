@@ -30,6 +30,35 @@ describe('safeReturnPath', () => {
   });
 });
 
+describe('library deep links', () => {
+  const id = '665f1c2ab4e5d1a2b3c4d5e6';
+
+  it.each([
+    `/library/books/${id}`,
+    `/library/books/${id}/edit`,
+    `/library/categories/${id}`,
+    `/library/collections/${id}`,
+    `/library/wishlist/${id}`,
+    '/library/new',
+    '/library/locations',
+    '/library/wishlist/new',
+  ])('accepts %s', (path) => {
+    expect(safeReturnPath(path)).toBe(path);
+  });
+
+  it.each([
+    `/library/books/${id.toUpperCase()}`,
+    `/library/books/${id}x`,
+    `/library/books/${id}/edit/more`,
+    `/library/books/${id}/../../evil`,
+    `/library/books/${id}?x=1`,
+    `//library/books/${id}`,
+    `/library/locations/${id}`,
+  ])('rejects %s', (path) => {
+    expect(safeReturnPath(path)).toBe('/');
+  });
+});
+
 describe('loginPathFor', () => {
   it('carries a known destination, encoded', () => {
     expect(loginPathFor('/library/wishlist')).toBe('/login?next=%2Flibrary%2Fwishlist');

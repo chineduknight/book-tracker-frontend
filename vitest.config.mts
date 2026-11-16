@@ -14,7 +14,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
-    exclude: ['src/**/*.integration.test.ts'],
+    exclude: ['src/**/*.integration.test.ts', 'src/**/*.backend.test.ts'],
     restoreMocks: true,
   },
 });

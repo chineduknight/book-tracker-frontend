@@ -1,10 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { navLabels, pages } from './routes';
-import { registerViaApi } from './support/session';
-
-test.beforeEach(async ({ page }) => {
-  await registerViaApi(page);
-});
+import { expect, test } from './support/reader';
 
 function primaryNav(page: Page) {
   return page.getByRole('navigation', { name: 'Primary' });
@@ -75,9 +71,9 @@ test.describe('navigating', () => {
     await expect(page).toHaveURL('/notes');
   });
 
-  test('the placeholder pages hold no buttons, only the account menu does', async ({ page }) => {
-    // The library features have no actions yet; any button in a page would be a dead control.
-    for (const { path } of pages) {
+  test('the unfinished tabs hold no buttons; only the account menu does', async ({ page }) => {
+    // Reading, Notes and Lending have no actions yet; any button there would be a dead control.
+    for (const path of ['/', '/reading', '/notes', '/lending']) {
       await page.goto(path);
       await expect(page.getByRole('main').getByRole('button')).toHaveCount(0);
       await expect(page.getByRole('banner').getByRole('button')).toHaveCount(1);
@@ -128,7 +124,7 @@ test.describe('keyboard', () => {
   });
 
   test('focus can travel through the whole page and wrap around (no traps)', async ({ page }) => {
-    await page.goto('/library');
+    await page.goto('/notes');
     const seen: string[] = [];
     for (let i = 0; i < 40; i++) {
       await page.keyboard.press('Tab');
@@ -141,6 +137,6 @@ test.describe('keyboard', () => {
     }
     expect(seen.at(-1)).toBe('Skip to content');
     for (const label of navLabels) expect(seen).toContain(label);
-    expect(seen).toContain('Wishlist');
+    expect(seen).toContain('Go to Reading');
   });
 });

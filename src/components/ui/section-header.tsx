@@ -1,7 +1,7 @@
 interface SectionHeaderProps {
   id: string;
   title: string;
-  description?: string;
+  description?: string | undefined;
 }
 
 /** An `<h2>` for a section. Pass the id to the section's `aria-labelledby`. */

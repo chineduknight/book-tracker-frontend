@@ -105,6 +105,24 @@ test.describe('sign in', () => {
     });
   }
 
+  test('keeps what was typed before the page became interactive', async ({ page }) => {
+    const { email } = await registerViaApi(page);
+    await page.context().clearCookies();
+    let releaseScripts: () => void = () => {};
+    const scriptsHeld = new Promise<void>((resolve) => (releaseScripts = resolve));
+    await page.route('**/_next/static/chunks/**', async (route) => {
+      await scriptsHeld;
+      await route.continue();
+    });
+    await page.goto('/login', { waitUntil: 'commit' });
+    await page.locator('input[name="email"]').fill(email);
+    releaseScripts();
+    await expect(page.locator('form')).toHaveAttribute('aria-busy', 'false');
+    await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL('/');
+  });
+
   test('says when the email or password is wrong', async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('Email').fill(uniqueEmail());

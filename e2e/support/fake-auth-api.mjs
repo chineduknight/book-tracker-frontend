@@ -7,6 +7,7 @@
 //   +shortsession  the session ends after 8 s
 //   outage@...     login drops the connection (network failure)
 //   ratelimited@   login answers 429 with Retry-After: 90
+// Every library endpoint answers 503, so the library's outage handling can be tested.
 // Test-only endpoints under /__test are served on loopback only.
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -195,8 +196,18 @@ const routes = {
   },
 };
 
+const LIBRARY_PATHS = /^\/api\/v1\/(books|copies|locations|categories|collections|wishlist)(\/|$)/;
+
 createServer((request, response) => {
   const path = new URL(request.url, 'http://x').pathname;
+  if (LIBRARY_PATHS.test(path)) {
+    return fail(
+      response,
+      503,
+      'SERVICE_UNAVAILABLE',
+      'Service is not ready: database is not connected',
+    );
+  }
   const route = routes[`${request.method} ${path}`];
   if (!route) return fail(response, 404, 'NOT_FOUND', 'Route not found');
   route(request, response).catch(() =>

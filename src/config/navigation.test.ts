@@ -12,12 +12,27 @@ describe('primary navigation', () => {
     ]);
   });
 
-  it('keeps Categories, Collections and Wishlist inside Library', () => {
+  it('keeps Categories, Collections, Wishlist and Locations inside Library', () => {
     expect(librarySections.map(({ href }) => href)).toEqual([
       '/library/categories',
       '/library/collections',
       '/library/wishlist',
+      '/library/locations',
     ]);
+  });
+
+  it('keeps Library active on every deeper library page', () => {
+    for (const pathname of [
+      '/library/new',
+      '/library/books/665f1c2ab4e5d1a2b3c4d5e6',
+      '/library/books/665f1c2ab4e5d1a2b3c4d5e6/edit',
+      '/library/categories/665f1c2ab4e5d1a2b3c4d5e6',
+      '/library/wishlist/new',
+      '/library/locations',
+    ]) {
+      const active = primaryNavigation.filter(({ href }) => isDestinationActive(href, pathname));
+      expect(active.map(({ href }) => href)).toEqual(['/library']);
+    }
   });
 
   it.each([

@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { pages, publicPages } from './routes';
-import { registerViaApi } from './support/session';
+import { expect, libraryApi, test, uniqueWord } from './support/reader';
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
@@ -15,21 +15,116 @@ async function expectNoViolations(page: Page) {
   expect(summary).toEqual([]);
 }
 
+interface Seeded {
+  bookId: string;
+  ebookId: string;
+  categoryId: string;
+  collectionId: string;
+  wishId: string;
+}
+
+/** Real records in the reader's library, created through the BFF. */
+async function seedLibrary(page: Page, origin: string): Promise<Seeded> {
+  const word = uniqueWord('axe');
+  const book = await libraryApi<{ id: string }>(page, origin, 'POST', '/api/library/books', {
+    title: `Middlemarch ${word}`,
+    authors: ['George Eliot'],
+    format: 'physical',
+    description: 'A study of provincial life.',
+  });
+  const ebook = await libraryApi<{ id: string }>(page, origin, 'POST', '/api/library/books', {
+    title: `Dune ${word}`,
+    format: 'ebook',
+  });
+  const location = await libraryApi<{ id: string }>(
+    page,
+    origin,
+    'POST',
+    '/api/library/locations',
+    {
+      name: `Shelf ${word}`,
+    },
+  );
+  await libraryApi(page, origin, 'POST', `/api/library/books/${book.id}/copies`, {
+    label: 'Signed',
+    condition: 'good',
+    locationId: location.id,
+  });
+  const category = await libraryApi<{ id: string }>(
+    page,
+    origin,
+    'POST',
+    '/api/library/categories',
+    {
+      name: `Fiction ${word}`,
+    },
+  );
+  const collection = await libraryApi<{ id: string }>(
+    page,
+    origin,
+    'POST',
+    '/api/library/collections',
+    {
+      name: `Shelf list ${word}`,
+    },
+  );
+  await libraryApi(page, origin, 'PUT', `/api/library/categories/${category.id}/books/${book.id}`);
+  const wish = await libraryApi<{ id: string }>(page, origin, 'POST', '/api/library/wishlist', {
+    title: `Wanted ${word}`,
+    sourceUrl: 'https://example.com/wanted',
+  });
+  return {
+    bookId: book.id,
+    ebookId: ebook.id,
+    categoryId: category.id,
+    collectionId: collection.id,
+    wishId: wish.id,
+  };
+}
+
 for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} theme`, () => {
     test.use({ colorScheme });
 
     test.describe('signed in', () => {
-      test.beforeEach(async ({ page }) => {
-        await registerViaApi(page);
-      });
-
       for (const { path } of pages) {
         test(`${path} has no automated accessibility violations`, async ({ page }) => {
           await page.goto(path);
           await expectNoViolations(page);
         });
       }
+
+      test('library records, forms and dialogs have no violations', async ({ page, baseURL }) => {
+        const seeded = await seedLibrary(page, baseURL!);
+        for (const path of [
+          `/library/books/${seeded.bookId}`,
+          `/library/books/${seeded.ebookId}`,
+          `/library/books/${seeded.bookId}/edit`,
+          '/library/new',
+          `/library/categories/${seeded.categoryId}`,
+          `/library/collections/${seeded.collectionId}`,
+          `/library/wishlist/${seeded.wishId}`,
+          '/library/wishlist/new',
+          '/library/wishlist?status=all',
+          '/library?q=nothingmatchesthisword',
+          '/library/books/000000000000000000000000',
+        ]) {
+          await page.goto(path);
+          await expectNoViolations(page);
+        }
+
+        await page.goto(`/library/books/${seeded.bookId}`);
+        await page.getByRole('button', { name: 'Add a copy' }).click();
+        await expectNoViolations(page);
+        await page.getByRole('button', { name: 'Delete book' }).click();
+        await expect(page.getByRole('dialog')).toBeVisible();
+        await expectNoViolations(page);
+
+        await page.goto('/library/new');
+        await page.getByRole('button', { name: 'Add book' }).click();
+        await expect(page.getByLabel('Title')).toHaveAttribute('aria-invalid', 'true');
+        await expectNoViolations(page);
+      });
 
       test('the open account menu has no violations', async ({ page }) => {
         await page.goto('/');
@@ -39,23 +134,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
       });
     });
 
-    for (const { path } of [...publicPages, { path: '/no-such-page' }]) {
-      test(`${path} has no automated accessibility violations`, async ({ page }) => {
-        await page.goto(path);
+    test.describe('signed out', () => {
+      test.use({ storageState: { cookies: [], origins: [] } });
+
+      for (const { path } of [...publicPages, { path: '/no-such-page' }]) {
+        test(`${path} has no automated accessibility violations`, async ({ page }) => {
+          await page.goto(path);
+          await expectNoViolations(page);
+        });
+      }
+
+      test('sign-in errors have no violations', async ({ page }) => {
+        await page.goto('/login');
+        await page.getByRole('button', { name: 'Sign in' }).click();
+        await expect(page.getByLabel('Email')).toHaveAttribute('aria-invalid', 'true');
         await expectNoViolations(page);
       });
-    }
-
-    test('sign-in errors have no violations', async ({ page }) => {
-      await page.goto('/login');
-      await page.getByRole('button', { name: 'Sign in' }).click();
-      await expect(page.getByLabel('Email')).toHaveAttribute('aria-invalid', 'true');
-      await expectNoViolations(page);
     });
   });
 }
 
 test.describe('themes', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test('follows the system light preference', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto('/login');
@@ -74,7 +175,6 @@ test.describe('reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
 
   test('transitions and animations are effectively disabled', async ({ page }) => {
-    await registerViaApi(page);
     await page.goto('/');
     await page.getByRole('button', { name: /^Account:/ }).click();
     const durations = await page.evaluate(() =>

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { readFormValues } from '@/lib/forms/read-form-values';
 import {
   NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
@@ -16,13 +17,10 @@ import { PasswordInput } from './password-input';
 import { useSessionForm } from './use-session-form';
 
 const FIELDS = ['name', 'email', 'password'] as const satisfies readonly RegistrationField[];
+const EMPTY: Record<RegistrationField, string> = { name: '', email: '', password: '' };
 
+/** Uncontrolled fields, as in SignInForm, so early typing is never lost. */
 export function RegisterForm({ returnPath }: { returnPath: string }) {
-  const [values, setValues] = useState<Record<RegistrationField, string>>({
-    name: '',
-    email: '',
-    password: '',
-  });
   const form = useSessionForm({
     endpoint: SESSION_API.register,
     fields: FIELDS,
@@ -30,19 +28,23 @@ export function RegisterForm({ returnPath }: { returnPath: string }) {
     returnPath,
   });
 
-  function update(field: RegistrationField, value: string) {
-    const next = { ...values, [field]: value };
-    setValues(next);
-    form.revalidate(field, next);
-  }
-
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void form.submit(values);
-  }
-
   return (
-    <form noValidate onSubmit={onSubmit} aria-busy={form.isBusy} className="flex flex-col gap-5">
+    <form
+      noValidate
+      onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        void form.submit(readFormValues(event.currentTarget, EMPTY));
+      }}
+      onChange={(event) => {
+        const changed: EventTarget = event.target;
+        const field = FIELDS.find(
+          (name) => changed instanceof HTMLInputElement && changed.name === name,
+        );
+        if (field) form.revalidate(field, readFormValues(event.currentTarget, EMPTY));
+      }}
+      aria-busy={form.isBusy}
+      className="flex flex-col gap-5"
+    >
       <FormError error={form.formError} errorRef={form.formErrorRef} />
       <Input
         ref={form.registerInput('name')}
@@ -51,9 +53,7 @@ export function RegisterForm({ returnPath }: { returnPath: string }) {
         autoComplete="name"
         maxLength={NAME_MAX_LENGTH}
         required
-        value={values.name}
         error={form.fieldErrors.name}
-        onChange={(event) => update('name', event.target.value)}
       />
       <Input
         ref={form.registerInput('email')}
@@ -65,9 +65,7 @@ export function RegisterForm({ returnPath }: { returnPath: string }) {
         autoCapitalize="none"
         spellCheck={false}
         required
-        value={values.email}
         error={form.fieldErrors.email}
-        onChange={(event) => update('email', event.target.value)}
       />
       <PasswordInput
         ref={form.registerInput('password')}
@@ -77,9 +75,7 @@ export function RegisterForm({ returnPath }: { returnPath: string }) {
         autoComplete="new-password"
         maxLength={PASSWORD_MAX_LENGTH}
         required
-        value={values.password}
         error={form.fieldErrors.password}
-        onChange={(event) => update('password', event.target.value)}
       />
       <Button type="submit" aria-disabled={form.isBusy} className="mt-1 w-full">
         {form.isBusy ? 'Creating your account…' : 'Create account'}

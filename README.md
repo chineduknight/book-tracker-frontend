@@ -8,9 +8,11 @@ What exists so far:
 
 - the signed-in app shell, navigation and design system (FE #15);
 - registration, sign-in, logout and an account menu, with browser sessions handled by a server-side
-  Backend-for-Frontend (FE #16).
+  Backend-for-Frontend (FE #16);
+- the Library: catalogue, books, physical copies, locations, categories, collections and the
+  wishlist with acquisition (FE #17; see [docs/library-contract.md](docs/library-contract.md)).
 
-The library features themselves (books, reading, notes, lending) are placeholders until FE #17–#19.
+Reading, Notes and Lending remain placeholders until FE #18–#19.
 
 ## Requirements
 
@@ -60,6 +62,25 @@ Building needs none of them; they are read at request time.
 | `npm run check:contrast`                     | WCAG contrast of every design-token pair                                  |
 | `npm run session-store:indexes [-- --apply]` | Operator tool: verify (read-only) or create missing session indexes       |
 | `npm run test:ci`                            | Everything CI runs, in order                                              |
+
+### Real-backend tests
+
+`npm run test:backend` and `npm run test:e2e` start the real Book Tracker API themselves from
+`BACKEND_DIR`: a checkout of `book-tracker-backend` at the commit pinned in CI, with `npm ci` run
+inside it. It runs against a disposable `book-tracker-fe-*` database on the local MongoDB, which is
+dropped afterwards. Without `BACKEND_DIR` these commands fail rather than skip.
+
+```bash
+git clone https://github.com/chineduknight/book-tracker-backend ../backend-for-tests
+git -C ../backend-for-tests checkout fea9c12e218f0322714f3e1c3139e494cbf90204 && (cd ../backend-for-tests && npm ci)
+BACKEND_DIR=../backend-for-tests npm run test:backend
+BACKEND_DIR=../backend-for-tests npm run test:e2e
+```
+
+The browser suite runs two app instances: port 3100 against a fake of the API's auth endpoints (for
+session faults such as outages, rate limits and short sessions) and port 3200 against the real API
+(every library journey). The real API allows 20 registrations per hour per process, so each test
+worker signs in to one reader account.
 
 First Playwright run: `npx playwright install chromium`. Integration and e2e tests expect MongoDB
 on `127.0.0.1:27018` (override with `BFF_SESSION_TEST_MONGODB_URI` / `E2E_SESSION_MONGODB_URI`;
@@ -124,5 +145,6 @@ a sidebar does. See [docs/decisions.md](docs/decisions.md).
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on pull requests and `main` with a
 MongoDB 8 service: `npm ci` → typecheck → lint → format → unit tests → session integration tests →
-contrast → build (sentinel configuration) → bundle check → Playwright → production dependency audit.
+library contract tests against the pinned real API → contrast → build (sentinel configuration) →
+bundle check → Playwright (real API and fake auth API) → production dependency audit.
 A separate job runs a full-history gitleaks secret scan. There is no deployment step.

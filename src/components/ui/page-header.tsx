@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 interface PageHeaderProps {
   title: string;
-  description?: string;
+  description?: string | undefined;
   /** Rendered above the title, e.g. a breadcrumb back to the parent section. */
   before?: ReactNode;
 }
