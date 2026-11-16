@@ -51,7 +51,9 @@ test('the full library journey, from an empty library', async ({ page, baseURL }
   await page.getByLabel('Condition').selectOption('like_new');
   await page.getByLabel('Location').selectOption({ label: `Study ${word}` });
   await page.getByRole('button', { name: 'Add copy' }).click();
-  await expect(page.getByText('Signed hardback')).toBeVisible();
+  await expect(
+    page.locator('li > div > div > p').filter({ hasText: /^Signed hardback #[0-9a-f]{6}$/ }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add a copy' }).click();
   await page.getByRole('button', { name: 'Add copy' }).click();
   await expect(page.getByText(/^Unlabelled copy #[0-9a-f]{6}$/)).toBeVisible();

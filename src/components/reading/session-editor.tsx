@@ -49,6 +49,14 @@ export function SessionEditor({
   useFocusFirstInvalid(formRef, isFinishing ? 0 : attempt, errorRef);
   const isFinished = session.status === 'completed';
 
+  function clearPendingFinishDate() {
+    const input = formRef.current?.querySelector<HTMLInputElement>('input[name="completedOn"]');
+    if (!input) return;
+    input.value = '';
+    // Keep the unsaved-changes guard in sync without discarding other session edits.
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
   function fail(problems: FieldErrors<SessionField>) {
     setErrors(problems);
     setAttempt((count) => count + 1);
@@ -137,20 +145,16 @@ export function SessionEditor({
         {isFinished ? null : (
           <Button
             variant="secondary"
+            className="min-w-0 max-w-full"
             onClick={() => {
               setError(null);
               setErrors({});
-                              // Reset the finish‑date input when opening the dialog
-                const form = formRef.current;
-                if (form) {
-                  const dateInput = form.querySelector<HTMLInputElement>('input[name="completedOn"]');
-                  if (dateInput) dateInput.value = '';
-                }
-                setIsFinishing(true);
+              clearPendingFinishDate();
+              setIsFinishing(true);
             }}
           >
-            <CircleCheck aria-hidden="true" className="size-4" />
-            Mark as finished…
+            <CircleCheck aria-hidden="true" className="size-4 shrink-0" />
+            <span className="min-w-0 wrap-anywhere">Mark as finished…</span>
           </Button>
         )}
       </div>
@@ -168,14 +172,9 @@ export function SessionEditor({
           isPending={isPending}
           onConfirm={() => void finish()}
           onCancel={() => {
-                // Clear the pending finish date when cancelling
-                const form = formRef.current;
-                if (form) {
-                  const dateInput = form.querySelector<HTMLInputElement>('input[name="completedOn"]');
-                  if (dateInput) dateInput.value = '';
-                }
-                setIsFinishing(false);
-              }}
+            clearPendingFinishDate();
+            setIsFinishing(false);
+          }}
           error={isFinishing ? <ActionError error={error} /> : null}
         >
           <div className="flex flex-col gap-4">

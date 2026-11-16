@@ -49,11 +49,13 @@ test('start from the book, progress to the last page, finish explicitly, then re
   await finish.click();
   const dialog = page.getByRole('dialog', { name: 'Mark this reading as finished?' });
   await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Finished on (optional)').fill('2026-11-16');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(finish).toBeFocused();
 
   await finish.click();
+  await expect(dialog.getByLabel('Finished on (optional)')).toHaveValue('');
   await dialog.getByRole('button', { name: 'Mark as finished' }).click();
   await expect(
     page.getByText('Reading marked as finished. It stays in your history.'),
