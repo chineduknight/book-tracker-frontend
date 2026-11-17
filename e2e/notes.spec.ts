@@ -16,72 +16,73 @@ async function newBook(page: Page, origin: string) {
 
 const HOSTILE = '<img src=x onerror="window.pwned=1"> [link](javascript:window.pwned=2)';
 
-test('a book-level note: literal Markdown, edit, whole-word and chapter search, confirmed delete', async ({
-  page,
-  baseURL,
-}) => {
-  const book = await newBook(page, baseURL!);
-  const word = uniqueWord('ardent');
-  await page.goto(`/library/books/${book.id}`);
-  const section = page.getByRole('region', { name: 'Notes and highlights' });
-  await expect(section.getByText('No notes or highlights for this book yet.')).toBeVisible();
-  await section.getByRole('link', { name: 'New note or highlight' }).click();
+test(
+  'a book-level note: literal Markdown, edit, whole-word and chapter search, confirmed delete',
+  { tag: '@critical' },
+  async ({ page, baseURL }) => {
+    const book = await newBook(page, baseURL!);
+    const word = uniqueWord('ardent');
+    await page.goto(`/library/books/${book.id}`);
+    const section = page.getByRole('region', { name: 'Notes and highlights' });
+    await expect(section.getByText('No notes or highlights for this book yet.')).toBeVisible();
+    await section.getByRole('link', { name: 'New note or highlight' }).click();
 
-  await expect(page).toHaveURL(`/notes/new?bookId=${book.id}`);
-  await expect(page.getByText(book.title, { exact: true })).toBeVisible();
-  await page.getByRole('radio', { name: /^Note/ }).check();
-  const source = `# ${word}\n\n${HOSTILE}\n\n    indented   line`;
-  await page.getByLabel('Your note').fill(source);
-  await page.getByLabel('Chapter (optional)').fill('Chapter 3');
-  await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page).toHaveURL(`/notes/new?bookId=${book.id}`);
+    await expect(page.getByText(book.title, { exact: true })).toBeVisible();
+    await page.getByRole('radio', { name: /^Note/ }).check();
+    const source = `# ${word}\n\n${HOSTILE}\n\n    indented   line`;
+    await page.getByLabel('Your note').fill(source);
+    await page.getByLabel('Chapter (optional)').fill('Chapter 3');
+    await page.getByRole('button', { name: 'Save note' }).click();
 
-  await expect(page).toHaveURL(/\/notes\/[0-9a-f]{24}\?notice=note-created$/);
-  const notePath = new URL(page.url()).pathname;
-  const main = page.getByRole('main');
-  await expect(main.getByText('Written in Markdown · shown as plain text')).toBeVisible();
-  await expect(main.locator('.font-mono').first()).toHaveText(source);
-  await expect(main.locator('img, iframe, script, a[href^="javascript"]')).toHaveCount(0);
-  expect(await page.evaluate(() => (window as { pwned?: number }).pwned)).toBeUndefined();
+    await expect(page).toHaveURL(/\/notes\/[0-9a-f]{24}\?notice=note-created$/);
+    const notePath = new URL(page.url()).pathname;
+    const main = page.getByRole('main');
+    await expect(main.getByText('Written in Markdown · shown as plain text')).toBeVisible();
+    await expect(main.locator('.font-mono').first()).toHaveText(source);
+    await expect(main.locator('img, iframe, script, a[href^="javascript"]')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as { pwned?: number }).pwned)).toBeUndefined();
 
-  await page.getByRole('link', { name: 'Edit note' }).click();
-  await page.getByLabel('Title (optional)').fill(`Thoughts ${word}`);
-  await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page).toHaveURL(`${notePath}?notice=note-saved`);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Thoughts ${word}`);
+    await page.getByRole('link', { name: 'Edit note' }).click();
+    await page.getByLabel('Title (optional)').fill(`Thoughts ${word}`);
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page).toHaveURL(`${notePath}?notice=note-saved`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Thoughts ${word}`);
 
-  await page.goto('/notes');
-  await page.getByLabel('Search words').fill(word.toUpperCase());
-  await page.getByLabel('Kind').selectOption('note');
-  await page.getByRole('button', { name: 'Apply' }).click();
-  await expect(page).toHaveURL(
-    (url) =>
-      url.searchParams.get('kind') === 'note' && url.searchParams.get('q') === word.toUpperCase(),
-  );
-  await expect(page.getByRole('link', { name: `Thoughts ${word}` })).toBeVisible();
+    await page.goto('/notes');
+    await page.getByLabel('Search words').fill(word.toUpperCase());
+    await page.getByLabel('Kind').selectOption('note');
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.searchParams.get('kind') === 'note' && url.searchParams.get('q') === word.toUpperCase(),
+    );
+    await expect(page.getByRole('link', { name: `Thoughts ${word}` })).toBeVisible();
 
-  await page.getByLabel('Kind').selectOption('highlight');
-  await page.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('No notes match')).toBeVisible();
+    await page.getByLabel('Kind').selectOption('highlight');
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByText('No notes match')).toBeVisible();
 
-  await page.goto(`/notes?q=${word.slice(0, -2)}`); // a prefix is not a whole word
-  await expect(page.getByText('No notes match')).toBeVisible();
-  await page.goto(`/notes?chapter=${encodeURIComponent('  CHAPTER 3 ')}&bookId=${book.id}`);
-  await expect(page.getByRole('link', { name: `Thoughts ${word}` })).toBeVisible();
-  await expect(page.getByText(`Showing notes about ${book.title}.`)).toBeVisible();
+    await page.goto(`/notes?q=${word.slice(0, -2)}`); // a prefix is not a whole word
+    await expect(page.getByText('No notes match')).toBeVisible();
+    await page.goto(`/notes?chapter=${encodeURIComponent('  CHAPTER 3 ')}&bookId=${book.id}`);
+    await expect(page.getByRole('link', { name: `Thoughts ${word}` })).toBeVisible();
+    await expect(page.getByText(`Showing notes about ${book.title}.`)).toBeVisible();
 
-  await page.goto(notePath);
-  const remove = page.getByRole('button', { name: 'Delete note' });
-  await remove.click();
-  const dialog = page.getByRole('dialog', { name: 'Delete this note?' });
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(remove).toBeFocused();
-  await remove.click();
-  await dialog.getByRole('button', { name: 'Delete note' }).click();
-  await expect(page).toHaveURL('/notes?notice=note-deleted');
-  await page.goto(notePath);
-  await expect(page.getByRole('heading', { name: 'Not found' })).toBeVisible();
-});
+    await page.goto(notePath);
+    const remove = page.getByRole('button', { name: 'Delete note' });
+    await remove.click();
+    const dialog = page.getByRole('dialog', { name: 'Delete this note?' });
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(remove).toBeFocused();
+    await remove.click();
+    await dialog.getByRole('button', { name: 'Delete note' }).click();
+    await expect(page).toHaveURL('/notes?notice=note-deleted');
+    await page.goto(notePath);
+    await expect(page.getByRole('heading', { name: 'Not found' })).toBeVisible();
+  },
+);
 
 test('a highlight linked to a reading, kept literal; the link is fixed to that book', async ({
   page,
@@ -136,48 +137,49 @@ test('a highlight linked to a reading, kept literal; the link is fixed to that b
   await expect(page.getByText('That book or reading isn’t available')).toBeVisible();
 });
 
-test('a long note typed before the page is interactive survives hydration, and leaving asks first', async ({
-  page,
-  baseURL,
-}) => {
-  const book = await newBook(page, baseURL!);
-  let releaseScripts: () => void = () => {};
-  const scriptsHeld = new Promise<void>((resolve) => (releaseScripts = resolve));
-  // Scripts only: the server-rendered form (and its styles) are usable before hydration.
-  await page.route('**/_next/static/chunks/**/*.js', async (route) => {
-    await scriptsHeld;
-    await route.continue();
-  });
-  await page.goto(`/notes/new?bookId=${book.id}`, { waitUntil: 'commit' });
-  const content = page.locator('textarea[name="content"]');
-  await content.waitFor();
-  const paragraph = 'A long reflection, line after line.\n';
-  const text = paragraph.repeat(400).trim(); // ~14,000 characters
-  await page.locator('input[name="kind"][value="note"]').check();
-  await content.fill(text);
-  await content.pressSequentially(' Typed early.');
-  releaseScripts();
+test(
+  'a long note typed before the page is interactive survives hydration, and leaving asks first',
+  { tag: '@critical' },
+  async ({ page, baseURL }) => {
+    const book = await newBook(page, baseURL!);
+    let releaseScripts: () => void = () => {};
+    const scriptsHeld = new Promise<void>((resolve) => (releaseScripts = resolve));
+    // Scripts only: the server-rendered form (and its styles) are usable before hydration.
+    await page.route('**/_next/static/chunks/**/*.js', async (route) => {
+      await scriptsHeld;
+      await route.continue();
+    });
+    await page.goto(`/notes/new?bookId=${book.id}`, { waitUntil: 'commit' });
+    const content = page.locator('textarea[name="content"]');
+    await content.waitFor();
+    const paragraph = 'A long reflection, line after line.\n';
+    const text = paragraph.repeat(400).trim(); // ~14,000 characters
+    await page.locator('input[name="kind"][value="note"]').check();
+    await content.fill(text);
+    await content.pressSequentially(' Typed early.');
+    releaseScripts();
 
-  // Once interactive, the counter includes the early text, and typing continues from it.
-  const counter = (count: number) =>
-    page.getByText(`${count.toLocaleString('en')} of 20,000 characters`);
-  await expect(counter(text.length + 13)).toBeVisible();
-  await content.press('End');
-  await content.pressSequentially('!');
-  await expect(counter(text.length + 14)).toBeVisible();
-  await expect(content).toHaveValue(`${text} Typed early.!`);
+    // Once interactive, the counter includes the early text, and typing continues from it.
+    const counter = (count: number) =>
+      page.getByText(`${count.toLocaleString('en')} of 20,000 characters`);
+    await expect(counter(text.length + 13)).toBeVisible();
+    await content.press('End');
+    await content.pressSequentially('!');
+    await expect(counter(text.length + 14)).toBeVisible();
+    await expect(content).toHaveValue(`${text} Typed early.!`);
 
-  await page.getByRole('navigation').getByRole('link', { name: 'Reading' }).first().click();
-  const leave = page.getByRole('dialog', { name: 'Discard unsaved changes?' });
-  await expect(leave).toBeVisible();
-  await leave.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page).toHaveURL(`/notes/new?bookId=${book.id}`);
-  await expect(content).toHaveValue(`${text} Typed early.!`);
+    await page.getByRole('navigation').getByRole('link', { name: 'Reading' }).first().click();
+    const leave = page.getByRole('dialog', { name: 'Discard unsaved changes?' });
+    await expect(leave).toBeVisible();
+    await leave.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(page).toHaveURL(`/notes/new?bookId=${book.id}`);
+    await expect(content).toHaveValue(`${text} Typed early.!`);
 
-  await page.getByRole('button', { name: 'Save note' }).click();
-  await expect(page).toHaveURL(/notice=note-created/);
-  await expect(page.getByRole('main').getByText('Typed early.!', { exact: false })).toBeVisible();
-});
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page).toHaveURL(/notice=note-created/);
+    await expect(page.getByRole('main').getByText('Typed early.!', { exact: false })).toBeVisible();
+  },
+);
 
 test('a 20,000-character note in multibyte text saves (past the 32 KiB library limit)', async ({
   page,

@@ -50,10 +50,25 @@ const realApiSpecs = [
   'reading-notes-layout.spec.ts',
   'lending.spec.ts',
   'home.spec.ts',
+  'shell-reflow.spec.ts',
+  'history-guard.spec.ts',
   'walkthrough.spec.ts',
 ];
 const mobile = devices['Pixel 7'];
 const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } };
+
+/*
+ * Firefox and WebKit run a focused critical path (tests tagged @critical): sign-in, sessions and
+ * logout; library, reading, notes, lending and Home journeys; ownership and missing records; the
+ * 320px/200%-text shell; Back/Forward with unsaved changes. Firefox runs as a desktop browser
+ * (Playwright cannot emulate a phone in Firefox); WebKit as an emulated iPhone. Playwright's WebKit
+ * is not Safari: real Safari and VoiceOver checks are manual (docs/qa-matrix.md).
+ * CI runs these projects in a separate job (`npm run test:e2e:cross-browser`), which starts its own
+ * API process and so has its own registration budget.
+ */
+const firefox = { ...devices['Desktop Firefox'], viewport: { width: 1280, height: 900 } };
+const webkit = devices['iPhone 13'];
+const critical = /@critical/;
 
 export default defineConfig({
   testDir: './e2e',
@@ -69,6 +84,30 @@ export default defineConfig({
     { name: 'desktop-chromium', testMatch: fakeApiSpecs, use: { ...desktop, baseURL: FAKE_APP } },
     { name: 'library-mobile', testMatch: realApiSpecs, use: { ...mobile, baseURL: REAL_APP } },
     { name: 'library-desktop', testMatch: realApiSpecs, use: { ...desktop, baseURL: REAL_APP } },
+    {
+      name: 'firefox-auth',
+      testMatch: fakeApiSpecs,
+      grep: critical,
+      use: { ...firefox, baseURL: FAKE_APP },
+    },
+    {
+      name: 'webkit-auth',
+      testMatch: fakeApiSpecs,
+      grep: critical,
+      use: { ...webkit, baseURL: FAKE_APP },
+    },
+    {
+      name: 'firefox',
+      testMatch: realApiSpecs,
+      grep: critical,
+      use: { ...firefox, baseURL: REAL_APP },
+    },
+    {
+      name: 'webkit',
+      testMatch: realApiSpecs,
+      grep: critical,
+      use: { ...webkit, baseURL: REAL_APP },
+    },
   ],
   webServer: [
     {
