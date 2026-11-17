@@ -13,11 +13,18 @@ What exists so far:
   wishlist with acquisition (FE #17; see [docs/library-contract.md](docs/library-contract.md));
 - Reading and Notes: reading sessions with progress, explicit completion and rereads, and private
   notes and highlights with search (FE #18; see
-  [docs/reading-notes-contract.md](docs/reading-notes-contract.md)).
-
+  [docs/reading-notes-contract.md](docs/reading-notes-contract.md));
 - Lending and the Home dashboard: loans of physical copies with returns and history, per-copy loan
   status, and an API-derived overview (FE #19; see
-  [docs/lending-dashboard-contract.md](docs/lending-dashboard-contract.md)).
+  [docs/lending-dashboard-contract.md](docs/lending-dashboard-contract.md));
+- final QA and launch preparation (FE #20): reflow at narrow widths and large text, Back/Forward
+  with unsaved changes, a Firefox and WebKit critical path, and the go/no-go package below.
+
+**Launch status: not deployed, no-go for production.** Start with
+[docs/launch-readiness.md](docs/launch-readiness.md) (configuration, gaps and owner decisions,
+hosting options, runbooks, gates), [docs/qa-matrix.md](docs/qa-matrix.md) (what is tested in which
+browser, and the manual checks still to do) and
+[docs/release-evidence.md](docs/release-evidence.md) (each go/no-go criterion with its evidence).
 
 ## Requirements
 
@@ -63,6 +70,7 @@ Building needs none of them; they are read at request time.
 | `npm test`                                   | Vitest unit and component tests                                           |
 | `npm run test:integration`                   | Session store tests against a real, local, disposable MongoDB             |
 | `npm run test:e2e`                           | Playwright on mobile and desktop Chromium (builds first when run locally) |
+| `npm run test:e2e:cross-browser`             | The `@critical` journeys in Firefox (desktop) and WebKit (iPhone)         |
 | `npm run test:accessibility`                 | Only the axe, theme and reduced-motion checks                             |
 | `npm run check:bundle`                       | Scans `.next/static` for server-only values (run after a build)           |
 | `npm run check:contrast`                     | WCAG contrast of every design-token pair                                  |
@@ -93,7 +101,8 @@ Playwright never reuses a server that is already running: if one of these ports 
 fails instead of testing the wrong server. The real API allows 20 registrations per hour per
 process, so each test worker signs in to one reader account.
 
-First Playwright run: `npx playwright install chromium`. Integration and e2e tests expect MongoDB
+First Playwright run: `npx playwright install chromium` (and `firefox webkit` for the
+cross-browser projects). Integration and e2e tests expect MongoDB
 on `127.0.0.1:27018` (override with `BFF_SESSION_TEST_MONGODB_URI` / `E2E_SESSION_MONGODB_URI`;
 loopback only). E2E tests run against a local fake of the API's auth endpoints
 (`e2e/support/fake-auth-api.mjs`), never a real account. The walkthrough spec writes screenshots
@@ -101,17 +110,17 @@ to `screenshots/` (git-ignored; CI uploads them as the `visual-walkthrough` arti
 
 ## Routes
 
-| Route                                                              | Access     | Purpose                                                    |
-| ------------------------------------------------------------------ | ---------- | ---------------------------------------------------------- |
-| `/login`, `/register`                                              | Signed out | Sign in, create an account (signed-in readers go home)     |
-| `/`                                                                | Signed in  | Home (FE #19 adds the overview)                            |
-| `/library` (+ books, locations, categories, collections, wishlist) | Signed in  | The Library (FE #17)                                       |
-| `/reading` (+ `/new`, `/[sessionId]`)                              | Signed in  | Reading history, starting, progress, finishing (FE #18)    |
-| `/notes` (+ `/new`, `/[noteId]`, `/[noteId]/edit`)                 | Signed in  | Notes and highlights (FE #18)                              |
-| `/api/library/*`, `/api/reading/*`, `/api/notes/*`                 | BFF        | One allowlisted API operation per route; never a proxy     |
-| `/lending`                                                         | Signed in  | Placeholder (FE #19)                                       |
-| `POST /api/session/register`, `/login`, `/logout`                  | BFF        | Same-origin JSON only; return a safe profile, never tokens |
-| `GET /api/session/me`                                              | BFF        | The signed-in reader's name and email                      |
+| Route                                                                | Access     | Purpose                                                     |
+| -------------------------------------------------------------------- | ---------- | ----------------------------------------------------------- |
+| `/login`, `/register`                                                | Signed out | Sign in, create an account (signed-in readers go home)      |
+| `/`                                                                  | Signed in  | Home: counts, attention, reading breakdown, recent activity |
+| `/library` (+ books, locations, categories, collections, wishlist)   | Signed in  | The Library (FE #17)                                        |
+| `/reading` (+ `/new`, `/[sessionId]`)                                | Signed in  | Reading history, starting, progress, finishing (FE #18)     |
+| `/notes` (+ `/new`, `/[noteId]`, `/[noteId]/edit`)                   | Signed in  | Notes and highlights (FE #18)                               |
+| `/api/library/*`, `/api/reading/*`, `/api/notes/*`, `/api/lending/*` | BFF        | One allowlisted API operation per route; never a proxy      |
+| `/lending` (+ `/new`, `/[loanId]`, `/copies/[copyId]`)               | Signed in  | Loans, lending a copy, returns, a copy's history (FE #19)   |
+| `POST /api/session/register`, `/login`, `/logout`                    | BFF        | Same-origin JSON only; return a safe profile, never tokens  |
+| `GET /api/session/me`                                                | BFF        | The signed-in reader's name and email                       |
 
 A signed-out visit to a private page redirects to `/login?next=<page>`; only known application paths
 are accepted as `next`. The five tabs are defined once in
@@ -160,4 +169,5 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on pull request
 MongoDB 8 service: `npm ci` → typecheck → lint → format → unit tests → session integration tests →
 library contract tests against the pinned real API → contrast → build (sentinel configuration) →
 bundle check → Playwright (real API and fake auth API) → production dependency audit.
-A separate job runs a full-history gitleaks secret scan. There is no deployment step.
+A second job runs the `@critical` journeys in Firefox and WebKit with its own API process, and a
+third runs a full-history gitleaks secret scan. There is no deployment step.
