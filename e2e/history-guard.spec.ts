@@ -31,9 +31,6 @@ test.describe('Back and Forward with unsaved changes', { tag: '@critical' }, () 
     ({ isMobile, browserName }) => isMobile && browserName === 'chromium',
     'history behaviour is the same at every size; Chromium runs it on desktop',
   );
-  // Known exception, recorded by the test below: Playwright's WebKit does not let a page cancel a
-  // Back/Forward traversal, so there the guard cannot ask first (docs/launch-readiness.md).
-  test.skip(({ browserName }) => browserName === 'webkit', 'WebKit: traversals not cancelable');
 
   test('a long note draft survives Back until the reader discards it', async ({
     page,
@@ -153,53 +150,5 @@ test.describe('Back and Forward with unsaved changes', { tag: '@critical' }, () 
     await expect(returnDialog).toBeVisible();
     await expect(returnDialog.getByLabel('Returned on')).toHaveValue('2026-11-10');
     await expect(page).toHaveURL(`/lending/${seeded.activeLoanId}`);
-  });
-});
-
-test.describe('Back without a cancelable traversal (WebKit)', { tag: '@critical' }, () => {
-  test.skip(({ browserName }) => browserName !== 'webkit', 'records the WebKit exception only');
-
-  test('Back with unsaved changes: what WebKit does', async ({ page, baseURL }) => {
-    const seeded = await seedReadingAndNotes(page, baseURL!);
-    await page.goto(`/notes?bookId=${seeded.bookId}`);
-    await page.getByRole('link', { name: 'New note or highlight' }).click();
-    await expect(page).toHaveURL(`/notes/new?bookId=${seeded.bookId}`);
-    await page.evaluate(() => {
-      const record = window as unknown as { events: string[] };
-      record.events = [`Navigation API: ${typeof window.navigation !== 'undefined'}`];
-      window.addEventListener('popstate', () =>
-        record.events.push(`popstate ${location.pathname}`),
-      );
-      window.navigation?.addEventListener('navigate', (event) => {
-        record.events.push(
-          `navigate ${event.navigationType} cancelable=${String(event.cancelable)} sameDocument=${String(event.destination.sameDocument)}`,
-        );
-        setTimeout(() =>
-          record.events.push(`  defaultPrevented=${String(event.defaultPrevented)}`),
-        );
-      });
-    });
-    const content = page.getByLabel('Your note');
-    await content.click();
-    await content.pressSequentially('Unsaved');
-    const report = async (step: string) => {
-      await page.waitForTimeout(1_000);
-      const state = await page.evaluate(() => ({
-        url: location.pathname + location.search,
-        dialog: Boolean(document.querySelector('dialog[open]')),
-        events: (window as unknown as { events: string[] }).events.splice(0),
-      }));
-      console.log(`WebKit ${step}: ${JSON.stringify(state)}`);
-      return state;
-    };
-    await back(page);
-    const first = await report('page.goBack()');
-    if (first.dialog) await page.keyboard.press('Escape');
-    await page.evaluate(() => history.back());
-    const second = await report('history.back()');
-    test.info().annotations.push({
-      type: 'known gap',
-      description: `goBack: ${JSON.stringify(first)}; history.back: ${JSON.stringify(second)}`,
-    });
   });
 });

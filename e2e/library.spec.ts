@@ -21,6 +21,9 @@ async function addBook(
   if (fields.format) await page.getByRole('radio', { name: fields.format }).check();
   await page.getByRole('button', { name: 'Add book' }).click();
   await expect(page).toHaveURL(/\/library\/books\/[0-9a-f]{24}\?notice=book-created$/);
+  // Let the client navigation finish rendering the book: Firefox aborts a new page.goto that
+  // starts while the previous navigation is still in flight (NS_BINDING_ABORTED).
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(fields.title);
   return page.url().split('?')[0]!;
 }
 
