@@ -32,7 +32,7 @@ export function LoanFields({
 }) {
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-5 sm:grid-cols-2 [&>*]:min-w-0">
+      <div className="grid gap-5 @md:grid-cols-2 [&>*]:min-w-0">
         <Input
           label="Borrower"
           name="borrowerName"

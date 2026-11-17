@@ -13,6 +13,9 @@ const variantClasses: Record<ButtonVariant, string> = {
 export function buttonClasses(variant: ButtonVariant = 'primary', className?: string): string {
   return cn(
     'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium',
+    // Never wider than its container: long labels wrap between words (and, for an unbroken
+    // string, anywhere) instead of pushing past the edge at large text sizes; icons keep their size.
+    'max-w-full min-w-0 text-center wrap-break-word [&>svg]:shrink-0',
     'motion-safe:transition-colors',
     'disabled:cursor-not-allowed disabled:opacity-60',
     variantClasses[variant],

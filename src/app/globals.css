@@ -1,6 +1,17 @@
 @import 'tailwindcss';
 
 /*
+ * The signed-in shell (components/layout/app-shell.tsx) is a size container named `shell`. Its
+ * layout switches on the room it actually has, measured in rem, so enlarged text (which scales
+ * every rem) moves to the phone layout just as a narrower screen does; a viewport media query
+ * cannot see text size. At 100% text these match Tailwind's sm/md/lg breakpoints.
+ */
+@custom-variant shell-roomy (@container shell (width >= 40rem));
+@custom-variant shell-narrow (@container shell (width < 48rem));
+@custom-variant shell-wide (@container shell (width >= 48rem));
+@custom-variant shell-wider (@container shell (width >= 64rem));
+
+/*
  * Design tokens: a quiet, modern reading room.
  *
  * Every colour the UI uses is defined once here, as a CSS variable, and exposed to Tailwind through
@@ -86,6 +97,19 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Focus and in-page scrolling stop clear of the sticky header and the phone bottom bar, so a
+       focused control is never hidden behind either (WCAG 2.4.11). The bar can grow to two rows
+       at large text sizes, hence the extra room. */
+    scroll-padding-top: calc(3.5rem + env(safe-area-inset-top));
+    scroll-padding-bottom: calc(var(--spacing-nav) + 1.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* On short landscape phones the header scrolls away instead of permanently taking a third of the
+     screen at large text sizes. */
+  @media (height < 30rem) {
+    html {
+      scroll-padding-top: 0;
+    }
   }
 
   body {

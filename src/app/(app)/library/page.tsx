@@ -133,7 +133,7 @@ export default async function LibraryPage({ searchParams }: PageProps<'/library'
           title="Organise your library"
           description="Categories, collections, your wishlist and storage locations live inside the Library."
         />
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-4 @md:grid-cols-2">
           {librarySections.map(({ href, label: title, icon, summary: description }) => (
             <li key={href}>
               <LinkCard href={href} title={title} description={description} icon={icon} />

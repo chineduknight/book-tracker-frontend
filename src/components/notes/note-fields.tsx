@@ -81,7 +81,7 @@ export function NoteTextFields({
         defaultValue={initial.title}
         error={errors.title}
       />
-      <div className="grid gap-5 sm:grid-cols-2 [&>*]:min-w-0">
+      <div className="grid gap-5 @md:grid-cols-2 [&>*]:min-w-0">
         <Input
           label="Chapter (optional)"
           name="chapter"

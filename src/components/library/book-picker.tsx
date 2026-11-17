@@ -174,7 +174,7 @@ export function BookPicker({
             {offered.map((book) => (
               <li
                 key={book.id}
-                className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3 @md:flex-row @md:items-center @md:justify-between"
               >
                 <span className="flex min-w-0 flex-col text-sm break-words">
                   <span className="font-medium text-ink">{book.title}</span>

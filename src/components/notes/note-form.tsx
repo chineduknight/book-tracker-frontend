@@ -149,7 +149,7 @@ export function NoteForm({
           Book
         </h2>
         {book ? (
-          <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-muted p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-muted p-3 @md:flex-row @md:items-center @md:justify-between">
             <p className="flex min-w-0 flex-col text-sm break-words">
               <span className="font-medium text-ink">{book.title}</span>
               <span className="text-ink-muted">{authorLine(book.authors)}</span>
@@ -197,7 +197,7 @@ export function NoteForm({
         <p id="kind-hint" className="text-xs text-ink-muted">
           Chosen once: a note can’t later become a highlight, or the other way round.
         </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 @md:flex-row">
           {NOTE_KINDS.map((value) => (
             <label
               key={value}

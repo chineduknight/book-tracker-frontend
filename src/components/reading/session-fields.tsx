@@ -41,7 +41,7 @@ export function SessionFields({
         <p id="progress-hint" className="text-xs text-ink-muted">
           {progressHint(lengths)}
         </p>
-        <div className="grid gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+        <div className="grid gap-3 @md:grid-cols-2 [&>*]:min-w-0">
           <Select
             label="Measured in"
             name="progressUnit"
@@ -65,7 +65,7 @@ export function SessionFields({
           />
         </div>
       </fieldset>
-      <div className="grid gap-5 sm:grid-cols-2 [&>*]:min-w-0">
+      <div className="grid gap-5 @md:grid-cols-2 [&>*]:min-w-0">
         <Input
           label="Started on (optional)"
           name="startedOn"

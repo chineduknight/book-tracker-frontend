@@ -77,20 +77,20 @@ export function AccountMenu({ name, email }: SignedInProfile) {
         aria-expanded={isOpen}
         aria-controls={panelId}
         onClick={() => setIsOpen((open) => !open)}
-        className="flex min-h-11 items-center gap-2 rounded-full py-1 pr-2 pl-1 text-sm font-medium text-ink hover:bg-surface-muted motion-safe:transition-colors"
+        className="flex min-h-11 min-w-11 items-center gap-2 rounded-full py-1 pr-2 pl-1 text-sm font-medium text-ink hover:bg-surface-muted motion-safe:transition-colors"
       >
         <span
           aria-hidden="true"
-          className="grid size-8 place-items-center rounded-full bg-accent-soft text-xs font-semibold text-accent-ink"
+          className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-semibold text-accent-ink"
         >
           {initialsOf(name)}
         </span>
         <span className="sr-only">Account:</span>{' '}
-        <span className="sr-only max-w-40 truncate sm:not-sr-only">{name}</span>
+        <span className="sr-only max-w-40 truncate @min-[40rem]/header:not-sr-only">{name}</span>
         <ChevronDown
           aria-hidden="true"
           className={cn(
-            'size-4 text-ink-muted motion-safe:transition-transform',
+            'size-4 shrink-0 text-ink-muted motion-safe:transition-transform',
             isOpen && 'rotate-180',
           )}
         />
@@ -99,10 +99,10 @@ export function AccountMenu({ name, email }: SignedInProfile) {
       <div
         id={panelId}
         hidden={!isOpen}
-        className="absolute top-full right-0 z-40 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-surface p-4 shadow-lg"
+        className="absolute top-full right-0 z-40 mt-2 max-h-[calc(100dvh-5rem-env(safe-area-inset-top))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-xl border border-line bg-surface p-4 shadow-lg"
       >
-        <p className="truncate font-medium text-ink">{name}</p>
-        <p className="text-sm break-all text-ink-muted">{email}</p>
+        <p className="font-medium wrap-anywhere text-ink">{name}</p>
+        <p className="text-sm wrap-anywhere text-ink-muted">{email}</p>
         <div className="my-3 border-t border-line" />
         {problem ? (
           <p role="alert" className="mb-3 text-sm text-danger">

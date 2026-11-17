@@ -134,7 +134,7 @@ export function StartReadingForm({
 
       <fieldset className="flex min-w-0 flex-col gap-2">
         <legend className="mb-1 text-sm font-medium text-ink">What are you recording?</legend>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <div className="flex flex-col gap-2 @md:flex-row @md:flex-wrap">
           {(
             [
               ['start', 'Start reading now', 'A new reading, in progress until you finish it.'],
