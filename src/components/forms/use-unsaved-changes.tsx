@@ -50,6 +50,17 @@ function leavingTraversal(event: NavigateEvent): string | null {
 }
 
 /**
+ * Whether Back and Forward can be guarded safely. Verified in Chromium and Firefox: the reader is
+ * asked every time and can always leave. In WebKit (Safari, and every browser on iOS, which all
+ * use it) the first Back is cancelled correctly, but afterwards Back does nothing at all, which
+ * would trap the reader; so WebKit is excluded and keeps the browser's plain behaviour. Detected by
+ * `navigator.vendor`, which every WebKit browser reports as Apple's.
+ */
+function traversalsCanBeGuarded(): boolean {
+  return typeof window.navigation !== 'undefined' && navigator.vendor !== 'Apple Computer, Inc.';
+}
+
+/**
  * Warns before unsaved form text is abandoned: in-app links (including the navigation bar and
  * Cancel) and the browser's Back and Forward within the app ask first in an accessible dialog, and
  * reloading or closing the tab triggers the browser's own prompt. Dirtiness is read from the fields
@@ -57,10 +68,10 @@ function leavingTraversal(event: NavigateEvent): string | null {
  * nothing is stored until the reader saves.
  *
  * Back and Forward use the Navigation API's cancelable traversals: no history entries are added
- * and nothing is rewritten, so the reader can never be trapped (browsers allow a page to cancel a
- * traversal only after a user interaction, and "Discard changes" completes it). Where the API is
- * missing or the browser does not let the traversal be cancelled, Back and Forward behave as
- * before and the form is discarded (see docs/launch-readiness.md).
+ * and nothing is rewritten (browsers allow a page to cancel a traversal only after a user
+ * interaction, and "Discard changes" completes it). Where the API is missing, or in WebKit (see
+ * {@link traversalsCanBeGuarded}), Back and Forward behave as before and the form is discarded
+ * (docs/launch-readiness.md, D1).
  */
 export function useUnsavedChanges<FormValues extends Values<FormValues>>(
   formRef: RefObject<HTMLFormElement | null>,
@@ -107,7 +118,7 @@ export function useUnsavedChanges<FormValues extends Values<FormValues>>(
       event.preventDefault();
       setPending({ kind: 'traverse', key });
     };
-    const history = typeof window.navigation === 'undefined' ? null : window.navigation;
+    const history = traversalsCanBeGuarded() ? window.navigation : null;
     window.addEventListener('beforeunload', onBeforeUnload);
     document.addEventListener('click', onClick, true);
     history?.addEventListener('navigate', onNavigate);

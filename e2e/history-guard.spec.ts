@@ -39,6 +39,7 @@ test.describe('Back and Forward with unsaved changes', { tag: '@critical' }, () 
     ({ isMobile, browserName }) => isMobile && browserName === 'chromium',
     'history behaviour is the same at every size; Chromium runs it on desktop',
   );
+  test.skip(({ browserName }) => browserName === 'webkit', 'not guarded in WebKit (see below)');
 
   test('a long note draft survives Back until the reader discards it', async ({
     page,
@@ -170,14 +171,14 @@ test.describe('Back and Forward with unsaved changes', { tag: '@critical' }, () 
 
 test.describe('A second Back straight after "Keep editing"', { tag: '@critical' }, () => {
   test.skip(
-    ({ isMobile, browserName }) => isMobile && browserName === 'chromium',
-    'Chromium runs it on desktop',
+    ({ isMobile, browserName }) =>
+      (isMobile && browserName === 'chromium') || browserName === 'webkit',
+    'Chromium runs it on desktop; WebKit is not guarded',
   );
 
-  // Browsers let a page cancel a Back only after a fresh user interaction, so a reader cannot be
-  // trapped. Whether choosing "Keep editing" counts differs between engines; this records what
-  // each one does, and insists only that the reader is never stuck.
-  test('either asks again or leaves; never stuck', async ({ page, baseURL, browserName }) => {
+  // Browsers let a page cancel a Back only after a user interaction, so a reader can never be
+  // trapped; choosing "Keep editing" counts as one in Chromium and Firefox.
+  test('asks again', async ({ page, baseURL }) => {
     const seeded = await seedReadingAndNotes(page, baseURL!);
     await page.goto(`/notes?bookId=${seeded.bookId}`);
     await page.getByRole('link', { name: 'New note or highlight' }).click();
@@ -186,19 +187,37 @@ test.describe('A second Back straight after "Keep editing"', { tag: '@critical' 
     await content.click();
     await content.pressSequentially('Unsaved');
     await back(page);
-    await expect(guard(page)).toBeVisible();
     await guard(page).getByRole('button', { name: 'Keep editing' }).click();
     await expect(guard(page)).toBeHidden();
-
     await back(page);
-    await page.waitForTimeout(1_000);
-    const asked = await guard(page).isVisible();
-    const left = new URL(page.url()).pathname === '/notes';
-    const outcome = asked ? 'asked again' : left ? 'left without asking' : 'stuck';
-    console.log(`${browserName}: second Back straight after Keep editing: ${outcome}`);
-    test
-      .info()
-      .annotations.push({ type: 'second Back', description: `${browserName}: ${outcome}` });
-    expect(outcome).not.toBe('stuck');
+    await expect(guard(page)).toBeVisible();
+    await guard(page).getByRole('button', { name: 'Discard changes' }).click();
+    await expect(page).toHaveURL(`/notes?bookId=${seeded.bookId}`);
+  });
+});
+
+test.describe('Back in WebKit (Safari, iOS)', { tag: '@critical' }, () => {
+  test.skip(({ browserName }) => browserName !== 'webkit', 'WebKit only');
+
+  // Not guarded: in WebKit a cancelled Back left later Back presses doing nothing (a trap), so the
+  // guard stays out of the way. Back leaves at once, as before FE #20; the gap is decision D1.
+  test('Back with unsaved changes leaves at once, every time: never trapped', async ({
+    page,
+    baseURL,
+  }) => {
+    const seeded = await seedReadingAndNotes(page, baseURL!);
+    await page.goto(`/notes?bookId=${seeded.bookId}`);
+    await page.getByRole('link', { name: 'New note or highlight' }).click();
+    await expect(page).toHaveURL(`/notes/new?bookId=${seeded.bookId}`);
+    const content = page.getByLabel('Your note');
+    await content.click();
+    await content.pressSequentially('Unsaved');
+    await back(page);
+    await expect(page).toHaveURL(`/notes?bookId=${seeded.bookId}`);
+    await expect(guard(page)).toHaveCount(0);
+    await forward(page);
+    await expect(page).toHaveURL(`/notes/new?bookId=${seeded.bookId}`);
+    await back(page);
+    await expect(page).toHaveURL(`/notes?bookId=${seeded.bookId}`);
   });
 });
