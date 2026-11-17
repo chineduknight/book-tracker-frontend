@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { seedLending } from './support/lending';
 import { expect, test } from './support/reader';
 import { seedReadingAndNotes } from './support/reading-notes';
@@ -12,6 +12,14 @@ import { seedReadingAndNotes } from './support/reading-notes';
 
 function guard(page: Page) {
   return page.getByRole('dialog', { name: 'Discard unsaved changes?' });
+}
+
+/** Puts the caret after the last character, as a reader carrying on writing would. */
+async function toEnd(field: Locator) {
+  await field.evaluate((el: HTMLInputElement | HTMLTextAreaElement) => {
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  });
 }
 
 async function historyLength(page: Page) {
@@ -56,12 +64,17 @@ test.describe('Back and Forward with unsaved changes', { tag: '@critical' }, () 
     await expect(content).toHaveValue(`${draft} End.`);
     expect(await historyLength(page)).toBe(entries);
 
-    // Escape is "Keep editing" too.
+    // The reader carries on writing, then tries to leave again. Escape is "Keep editing" too.
+    await toEnd(content);
+    await content.pressSequentially(' More.');
     await back(page);
     await expect(guard(page)).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(guard(page)).toBeHidden();
-    await expect(content).toHaveValue(`${draft} End.`);
+    await expect(content).toHaveValue(`${draft} End. More.`);
+
+    await toEnd(content);
+    await content.pressSequentially('!');
 
     await back(page);
     await guard(page).getByRole('button', { name: 'Discard changes' }).click();
@@ -131,7 +144,9 @@ test.describe('Back and Forward with unsaved changes', { tag: '@critical' }, () 
     await guard(page).getByRole('button', { name: 'Keep editing' }).click();
     await expect(borrower).toHaveValue('Isioma');
 
-    // Changed, then Back and Forward again: the reader is asked each time and can still leave.
+    // The reader edits again, then leaves: asked again, and can still leave.
+    await toEnd(borrower);
+    await borrower.pressSequentially(' O.');
     await back(page);
     await guard(page).getByRole('button', { name: 'Discard changes' }).click();
     await expect(page).toHaveURL(`/lending/new?bookId=${seeded.bookId}`);
@@ -150,5 +165,40 @@ test.describe('Back and Forward with unsaved changes', { tag: '@critical' }, () 
     await expect(returnDialog).toBeVisible();
     await expect(returnDialog.getByLabel('Returned on')).toHaveValue('2026-11-10');
     await expect(page).toHaveURL(`/lending/${seeded.activeLoanId}`);
+  });
+});
+
+test.describe('A second Back straight after "Keep editing"', { tag: '@critical' }, () => {
+  test.skip(
+    ({ isMobile, browserName }) => isMobile && browserName === 'chromium',
+    'Chromium runs it on desktop',
+  );
+
+  // Browsers let a page cancel a Back only after a fresh user interaction, so a reader cannot be
+  // trapped. Whether choosing "Keep editing" counts differs between engines; this records what
+  // each one does, and insists only that the reader is never stuck.
+  test('either asks again or leaves; never stuck', async ({ page, baseURL, browserName }) => {
+    const seeded = await seedReadingAndNotes(page, baseURL!);
+    await page.goto(`/notes?bookId=${seeded.bookId}`);
+    await page.getByRole('link', { name: 'New note or highlight' }).click();
+    await expect(page).toHaveURL(`/notes/new?bookId=${seeded.bookId}`);
+    const content = page.getByLabel('Your note');
+    await content.click();
+    await content.pressSequentially('Unsaved');
+    await back(page);
+    await expect(guard(page)).toBeVisible();
+    await guard(page).getByRole('button', { name: 'Keep editing' }).click();
+    await expect(guard(page)).toBeHidden();
+
+    await back(page);
+    await page.waitForTimeout(1_000);
+    const asked = await guard(page).isVisible();
+    const left = new URL(page.url()).pathname === '/notes';
+    const outcome = asked ? 'asked again' : left ? 'left without asking' : 'stuck';
+    console.log(`${browserName}: second Back straight after Keep editing: ${outcome}`);
+    test
+      .info()
+      .annotations.push({ type: 'second Back', description: `${browserName}: ${outcome}` });
+    expect(outcome).not.toBe('stuck');
   });
 });
