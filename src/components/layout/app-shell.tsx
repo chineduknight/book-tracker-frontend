@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { SignedInProfile } from '@/lib/auth/session-api';
+import { KeepFocusVisible } from './keep-focus-visible';
 import { PrimaryNavigation } from './primary-navigation';
 import { SiteHeader } from './site-header';
 
@@ -15,6 +16,7 @@ import { SiteHeader } from './site-header';
 export function AppShell({ profile, children }: { profile: SignedInProfile; children: ReactNode }) {
   return (
     <div className="@container/shell flex min-h-dvh flex-col">
+      <KeepFocusVisible />
       <SiteHeader profile={profile} />
       <div className="flex flex-1 shell-wide:items-start">
         <PrimaryNavigation />

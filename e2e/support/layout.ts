@@ -13,16 +13,22 @@ export async function expectNoHorizontalScroll(page: Page, context = '') {
       }
       return false;
     };
-    const culprits = [...document.querySelectorAll('body *')]
+    // Boxes past the edge (where the overflow starts), or else content spilling out of a box
+    // (text or an intrinsic control size wider than its element).
+    const all = [...document.querySelectorAll('body *')].filter((el) => !inFixed(el));
+    const boxes = all
       .filter((el) => el.getBoundingClientRect().right > width + 1)
-      .filter((el) => (el.parentElement?.getBoundingClientRect().right ?? 0) <= width + 1)
-      .filter((el) => !inFixed(el))
-      .slice(0, 5)
-      .map((el) => {
-        const box = el.getBoundingClientRect();
-        const text = (el.textContent ?? '').trim().slice(0, 40);
-        return `<${el.tagName.toLowerCase()} class="${String(el.className).slice(0, 80)}"> "${text}" [${Math.round(box.left)}–${Math.round(box.right)}]`;
-      });
+      .filter((el) => (el.parentElement?.getBoundingClientRect().right ?? 0) <= width + 1);
+    const spills = all.filter(
+      (el) =>
+        el.scrollWidth > el.clientWidth + 1 &&
+        el.getBoundingClientRect().left + el.scrollWidth > width + 1,
+    );
+    const culprits = (boxes.length > 0 ? boxes : spills.slice(-5)).slice(0, 5).map((el) => {
+      const box = el.getBoundingClientRect();
+      const text = (el.textContent ?? '').trim().slice(0, 40);
+      return `<${el.tagName.toLowerCase()} class="${String(el.className).slice(0, 80)}"> "${text}" [${Math.round(box.left)}–${Math.round(box.right)}]`;
+    });
     return { overflow: document.documentElement.scrollWidth - width, culprits };
   });
   expect(overflow, `${context} overflow starts at: ${culprits.join(' | ')}`).toBeLessThanOrEqual(0);

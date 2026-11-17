@@ -151,47 +151,61 @@ test.describe('shell at 320px and 200% text', { tag: '@critical' }, () => {
     }
   });
 
-  test('keyboard focus is never hidden behind the header or the bottom bar', async ({ page }) => {
-    await page.goto('/');
-    await setTextSize(page, 200);
-    let checked = 0;
-    for (let i = 0; i < 40; i++) {
-      await page.keyboard.press('Tab');
-      const focus = await page.evaluate(() => {
-        const el = document.activeElement;
-        if (!el || !el.closest('#main-content') || el.id === 'main-content') return null;
-        const box = el.getBoundingClientRect();
-        const headerBottom = document.querySelector('header')!.getBoundingClientRect().bottom;
-        const navTop = document
-          .querySelector('nav[aria-label="Primary"]')!
-          .getBoundingClientRect().top;
-        return {
-          name: (el.textContent ?? '').trim().slice(0, 30),
-          top: box.top,
-          bottom: box.bottom,
-          headerBottom,
-          navTop,
-        };
-      });
-      if (!focus) continue;
-      checked++;
-      const where = `"${focus.name}" at ${Math.round(focus.top)}–${Math.round(focus.bottom)}, visible area ${Math.round(focus.headerBottom)}–${Math.round(focus.navTop)}`;
-      if (focus.bottom - focus.top <= focus.navTop - focus.headerBottom) {
-        // Fits between the bars, so it must be fully visible: stronger than WCAG 2.4.11.
-        expect(focus.top, `${where}: under the header`).toBeGreaterThanOrEqual(
-          focus.headerBottom - 1,
-        );
-        expect(focus.bottom, `${where}: behind the bottom bar`).toBeLessThanOrEqual(
-          focus.navTop + 1,
-        );
-      } else {
-        // Taller than the space between the bars: never entirely hidden (WCAG 2.4.11).
-        expect(focus.bottom, `${where}: hidden`).toBeGreaterThan(focus.headerBottom);
-        expect(focus.top, `${where}: hidden`).toBeLessThan(focus.navTop);
+  // Twice: as shipped, and with scroll-padding switched off, as in engines whose focus scrolling
+  // ignores it (WebKit), so the script fallback is proven on its own.
+  for (const scrollPadding of ['as shipped', 'ignored'] as const) {
+    test(`keyboard focus is never hidden behind the header or the bottom bar (scroll-padding ${scrollPadding})`, async ({
+      page,
+    }) => {
+      await page.goto('/');
+      await setTextSize(page, 200);
+      if (scrollPadding === 'ignored') {
+        await page.evaluate(() => (document.documentElement.style.scrollPadding = '0'));
       }
-    }
-    expect(checked).toBeGreaterThan(5);
-  });
+      let checked = 0;
+      for (let i = 0; i < 40; i++) {
+        await page.keyboard.press('Tab');
+        // Let the fallback's animation-frame nudge run before measuring.
+        await page.evaluate(
+          () =>
+            new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+        );
+        const focus = await page.evaluate(() => {
+          const el = document.activeElement;
+          if (!el || !el.closest('#main-content') || el.id === 'main-content') return null;
+          const box = el.getBoundingClientRect();
+          const headerBottom = document.querySelector('header')!.getBoundingClientRect().bottom;
+          const navTop = document
+            .querySelector('nav[aria-label="Primary"]')!
+            .getBoundingClientRect().top;
+          return {
+            name: (el.textContent ?? '').trim().slice(0, 30),
+            top: box.top,
+            bottom: box.bottom,
+            headerBottom,
+            navTop,
+          };
+        });
+        if (!focus) continue;
+        checked++;
+        const where = `"${focus.name}" at ${Math.round(focus.top)}–${Math.round(focus.bottom)}, visible area ${Math.round(focus.headerBottom)}–${Math.round(focus.navTop)}`;
+        if (focus.bottom - focus.top <= focus.navTop - focus.headerBottom) {
+          // Fits between the bars, so it must be fully visible: stronger than WCAG 2.4.11.
+          expect(focus.top, `${where}: under the header`).toBeGreaterThanOrEqual(
+            focus.headerBottom - 1,
+          );
+          expect(focus.bottom, `${where}: behind the bottom bar`).toBeLessThanOrEqual(
+            focus.navTop + 1,
+          );
+        } else {
+          // Taller than the space between the bars: never entirely hidden (WCAG 2.4.11).
+          expect(focus.bottom, `${where}: hidden`).toBeGreaterThan(focus.headerBottom);
+          expect(focus.top, `${where}: hidden`).toBeLessThan(focus.navTop);
+        }
+      }
+      expect(checked).toBeGreaterThan(5);
+    });
+  }
 
   test('the account menu opens inside the screen with a long name and address', async ({
     page,

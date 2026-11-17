@@ -285,10 +285,9 @@ test(
     }
     expect(dialogs).toBe(0);
 
-    // Clearing the day and applying is reported too, rather than quietly meaning "today".
-    await page.goto('/lending?status=overdue&asOf=2026-01-10');
-    await page.getByLabel('Overdue as of').fill('');
-    await page.getByRole('button', { name: 'Apply' }).click();
+    // An empty day (what the form sends when the date is cleared) is reported too, rather than
+    // quietly meaning "today". Loaded directly: emulated iOS date fields cannot be cleared by script.
+    await page.goto('/lending?status=overdue&asOf=');
     await expect(problem).toContainText('without saying as of which day');
 
     await problem.getByRole('link', { name: 'Reset to today' }).click();
