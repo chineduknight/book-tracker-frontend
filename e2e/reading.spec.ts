@@ -14,73 +14,74 @@ async function newBook(page: Page, origin: string, extra: Record<string, unknown
   return { id: book.id, title };
 }
 
-test('start from the book, progress to the last page, finish explicitly, then reread', async ({
-  page,
-  baseURL,
-}) => {
-  const book = await newBook(page, baseURL!, { pageCount: 320 });
-  await page.goto(`/library/books/${book.id}`);
-  const reading = page.getByRole('region', { name: 'Reading' });
-  await expect(reading.getByText('Not read yet')).toBeVisible();
-  await expect(reading.getByText('0 readings · 0 finished')).toBeVisible();
-  await reading.getByRole('link', { name: 'Start reading' }).click();
+test(
+  'start from the book, progress to the last page, finish explicitly, then reread',
+  { tag: '@critical' },
+  async ({ page, baseURL }) => {
+    const book = await newBook(page, baseURL!, { pageCount: 320 });
+    await page.goto(`/library/books/${book.id}`);
+    const reading = page.getByRole('region', { name: 'Reading' });
+    await expect(reading.getByText('Not read yet')).toBeVisible();
+    await expect(reading.getByText('0 readings · 0 finished')).toBeVisible();
+    await reading.getByRole('link', { name: 'Start reading' }).click();
 
-  await expect(page).toHaveURL(`/reading/new?bookId=${book.id}`);
-  await page.getByRole('button', { name: 'Start reading' }).click();
-  await expect(page).toHaveURL(/\/reading\/[0-9a-f]{24}\?notice=reading-started$/);
-  const sessionPath = new URL(page.url()).pathname;
-  await expect(page.getByText('No dates recorded')).toBeVisible();
+    await expect(page).toHaveURL(`/reading/new?bookId=${book.id}`);
+    await page.getByRole('button', { name: 'Start reading' }).click();
+    await expect(page).toHaveURL(/\/reading\/[0-9a-f]{24}\?notice=reading-started$/);
+    const sessionPath = new URL(page.url()).pathname;
+    await expect(page.getByText('No dates recorded')).toBeVisible();
 
-  await page.getByLabel('Measured in').selectOption('pages');
-  await page.getByLabel('Amount').fill('321');
-  await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('This book has 320 pages; enter at most 320.')).toBeVisible();
-  await expect(page.getByLabel('Amount')).toBeFocused();
+    await page.getByLabel('Measured in').selectOption('pages');
+    await page.getByLabel('Amount').fill('321');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByText('This book has 320 pages; enter at most 320.')).toBeVisible();
+    await expect(page.getByLabel('Amount')).toBeFocused();
 
-  await page.getByLabel('Amount').fill('320');
-  await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('Changes saved.')).toBeVisible();
-  await expect(page.getByText('Page 320 of 320')).toBeVisible();
-  // Reaching the last page never finishes the reading by itself.
-  await expect(page.getByRole('button', { name: 'Mark as finished…' })).toBeVisible();
+    await page.getByLabel('Amount').fill('320');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByText('Changes saved.')).toBeVisible();
+    await expect(page.getByText('Page 320 of 320')).toBeVisible();
+    // Reaching the last page never finishes the reading by itself.
+    await expect(page.getByRole('button', { name: 'Mark as finished…' })).toBeVisible();
 
-  // Escape closes the confirmation without changing anything, and focus returns.
-  const finish = page.getByRole('button', { name: 'Mark as finished…' });
-  await finish.click();
-  const dialog = page.getByRole('dialog', { name: 'Mark this reading as finished?' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel('Finished on (optional)').fill('2026-11-16');
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(finish).toBeFocused();
+    // Escape closes the confirmation without changing anything, and focus returns.
+    const finish = page.getByRole('button', { name: 'Mark as finished…' });
+    await finish.click();
+    const dialog = page.getByRole('dialog', { name: 'Mark this reading as finished?' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel('Finished on (optional)').fill('2026-11-16');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(finish).toBeFocused();
 
-  await finish.click();
-  await expect(dialog.getByLabel('Finished on (optional)')).toHaveValue('');
-  await dialog.getByRole('button', { name: 'Mark as finished' }).click();
-  await expect(
-    page.getByText('Reading marked as finished. It stays in your history.'),
-  ).toBeVisible();
-  await expect(page.getByText('No dates recorded')).toBeVisible(); // no finish date invented
-  await expect(page.getByRole('button', { name: 'Mark as finished…' })).toHaveCount(0);
+    await finish.click();
+    await expect(dialog.getByLabel('Finished on (optional)')).toHaveValue('');
+    await dialog.getByRole('button', { name: 'Mark as finished' }).click();
+    await expect(
+      page.getByText('Reading marked as finished. It stays in your history.'),
+    ).toBeVisible();
+    await expect(page.getByText('No dates recorded')).toBeVisible(); // no finish date invented
+    await expect(page.getByRole('button', { name: 'Mark as finished…' })).toHaveCount(0);
 
-  await page.goto(`/library/books/${book.id}`);
-  await expect(reading.getByText('1 reading · 1 finished')).toBeVisible();
-  await reading.getByRole('link', { name: 'Reread' }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Reread “${book.title}”`);
-  await page.getByRole('button', { name: 'Start reading' }).click();
-  await expect(page).toHaveURL(/notice=reading-started/);
-  await expect(page.getByText('Rereading').first()).toBeVisible();
+    await page.goto(`/library/books/${book.id}`);
+    await expect(reading.getByText('1 reading · 1 finished')).toBeVisible();
+    await reading.getByRole('link', { name: 'Reread' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Reread “${book.title}”`);
+    await page.getByRole('button', { name: 'Start reading' }).click();
+    await expect(page).toHaveURL(/notice=reading-started/);
+    await expect(page.getByText('Rereading').first()).toBeVisible();
 
-  // The first reading is untouched.
-  await page.goto(sessionPath);
-  await expect(page.getByText('Page 320 of 320')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Correct this reading' })).toBeVisible();
+    // The first reading is untouched.
+    await page.goto(sessionPath);
+    await expect(page.getByText('Page 320 of 320')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Correct this reading' })).toBeVisible();
 
-  await page.goto(`/library/books/${book.id}`);
-  await expect(reading.getByText('Rereading').first()).toBeVisible();
-  await expect(reading.getByText('2 readings · 1 finished')).toBeVisible();
-  await expect(reading.getByRole('link', { name: 'Continue rereading' })).toBeVisible();
-});
+    await page.goto(`/library/books/${book.id}`);
+    await expect(reading.getByText('Rereading').first()).toBeVisible();
+    await expect(reading.getByText('2 readings · 1 finished')).toBeVisible();
+    await expect(reading.getByRole('link', { name: 'Continue rereading' })).toBeVisible();
+  },
+);
 
 test('records a past read with real calendar days, refusing an impossible order', async ({
   page,
@@ -104,23 +105,26 @@ test('records a past read with real calendar days, refusing an impossible order'
   await expect(page.getByText('Rated 4 out of 5')).toBeAttached();
 });
 
-test.describe('in another time zone', () => {
-  test.use({ timezoneId: 'Pacific/Kiritimati' });
+// UTC+14 and UTC−11: the two ends of the world's clocks.
+for (const timezoneId of ['Pacific/Kiritimati', 'Pacific/Pago_Pago']) {
+  test.describe(`in another time zone (${timezoneId})`, () => {
+    test.use({ timezoneId });
 
-  test('calendar days never shift', async ({ page, baseURL }) => {
-    const book = await newBook(page, baseURL!);
-    const session = await libraryApi<{ id: string }>(
-      page,
-      baseURL!,
-      'POST',
-      `/api/reading/books/${book.id}/sessions`,
-      { status: 'completed', startedOn: '2026-01-01', completedOn: '2026-12-31' },
-    );
-    await page.goto(`/reading/${session.id}`);
-    await expect(page.getByText('Started 1 Jan 2026 · Finished 31 Dec 2026')).toBeVisible();
-    await expect(page.getByLabel('Started on (optional)')).toHaveValue('2026-01-01');
+    test('calendar days never shift', { tag: '@critical' }, async ({ page, baseURL }) => {
+      const book = await newBook(page, baseURL!);
+      const session = await libraryApi<{ id: string }>(
+        page,
+        baseURL!,
+        'POST',
+        `/api/reading/books/${book.id}/sessions`,
+        { status: 'completed', startedOn: '2026-01-01', completedOn: '2026-12-31' },
+      );
+      await page.goto(`/reading/${session.id}`);
+      await expect(page.getByText('Started 1 Jan 2026 · Finished 31 Dec 2026')).toBeVisible();
+      await expect(page.getByLabel('Started on (optional)')).toHaveValue('2026-01-01');
+    });
   });
-});
+}
 
 test('a reading started on another device is never duplicated', async ({ page, baseURL }) => {
   const book = await newBook(page, baseURL!);

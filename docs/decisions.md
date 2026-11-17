@@ -153,6 +153,34 @@ decisions:
 - **Only four browser routes**: create, copy status, edit, return. Pages read on the server, so no
   list or dashboard route is exposed to the browser. No new dependencies.
 
+## Final QA and launch readiness (FE #20)
+
+- **The shell adapts to room, not to the viewport.** The shell, header, bottom bar and `main` are
+  CSS size containers, and layouts switch on their width in `rem` (named variants `shell-narrow`,
+  `shell-wide`, …, and `@md` inside `main`). Enlarged text scales every `rem`, so it reaches the
+  phone layout as a narrower screen does; a viewport media query cannot see text size. At 100%
+  text the breakpoints equal Tailwind's.
+- **At large text, compact rather than hidden.** The header keeps the logo and moves the brand name
+  to screen-reader text; the bottom bar becomes two rows of three and two, dropping only the
+  decorative icons. Functional labels are never hidden.
+- **Layout tests look for what readers see**: overlap per line box, clipped labels, words split
+  across lines, content-column width, 44×44 targets and focus obscured by the bars, not only
+  horizontal scrolling. "No horizontal scrollbar" passed while the FE #19 header overlapped.
+- **Focus is kept visible by CSS first** (`scroll-padding`), with a small script fallback for engines
+  whose focus scrolling ignores it (WebKit).
+- **Back/Forward with unsaved changes uses the Navigation API's cancelable traversals** and never
+  manipulates history (no sentinel entries, no `pushState` traps), which could trap readers and
+  confuse the router. It is enabled only where it was verified to ask every time and always let
+  the reader leave (Chromium, Firefox). In WebKit a cancelled Back left later Back presses doing
+  nothing, a trap, so WebKit browsers (identified by `navigator.vendor`) keep the plain behaviour;
+  the gap is an owner decision (launch-readiness.md, D1).
+- **A rejected overdue reference day is reported, never replaced.** Loans are not loaded and the
+  rejected text is shown as text, with "Reset to today".
+- **A tile whose link lists something else says so** inside the link ("Opens finished readings,
+  where each reread is listed") rather than adding a unique-books view the API does not offer.
+- **Firefox and WebKit run the `@critical` journeys in a separate CI job** with its own API process,
+  because the API limits registrations per process.
+
 ## API transport
 
 See the README's "Backend integration" section for the interface. Choices worth recording:
@@ -180,4 +208,6 @@ Every response sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
 fresh nonce per request and `'strict-dynamic'`: no `unsafe-inline`, and `unsafe-eval` only in
 development. It sends HSTS when `APP_ORIGIN` is https. Nonces require per-request rendering, so the
 root layout opts every page into dynamic rendering; private pages must never be prerendered anyway.
-Pages are `noindex`, and Next.js telemetry is disabled in CI.
+Pages are `noindex` (meta tag), and since FE #20 every response, JSON included, also sends
+`X-Robots-Tag: noindex, nofollow, noarchive`; there is no `robots.txt` that would stop crawlers
+from seeing it. Next.js telemetry is disabled in CI.

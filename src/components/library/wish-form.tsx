@@ -110,7 +110,7 @@ export function WishForm({ wish, onDone }: { wish?: WishlistItem; onDone?: () =>
         defaultValue={initial.authors}
         error={errors.authors}
       />
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 @md:grid-cols-2">
         <Select label="Priority" name="priority" defaultValue={initial.priority}>
           {WISHLIST_PRIORITIES.map((priority) => (
             <option key={priority} value={priority}>

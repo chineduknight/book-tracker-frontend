@@ -28,25 +28,26 @@ test('every library write refuses a foreign or missing origin', async ({ page, b
   await expect(page.getByText('No copies recorded yet.')).toBeVisible();
 });
 
-test('library reads and writes need a session, and never reveal foreign records', async ({
-  playwright,
-  baseURL,
-}) => {
-  const anonymous = await playwright.request.newContext({
-    baseURL: baseURL!,
-    storageState: { cookies: [], origins: [] },
-  });
-  expect((await anonymous.get('/api/library/books')).status()).toBe(401);
-  expect(
-    (
-      await anonymous.post('/api/library/books', {
-        data: { title: 'x', format: 'ebook' },
-        headers: { Origin: baseURL! },
-      })
-    ).status(),
-  ).toBe(401);
-  await anonymous.dispose();
-});
+test(
+  'library reads and writes need a session, and never reveal foreign records',
+  { tag: '@critical' },
+  async ({ playwright, baseURL }) => {
+    const anonymous = await playwright.request.newContext({
+      baseURL: baseURL!,
+      storageState: { cookies: [], origins: [] },
+    });
+    expect((await anonymous.get('/api/library/books')).status()).toBe(401);
+    expect(
+      (
+        await anonymous.post('/api/library/books', {
+          data: { title: 'x', format: 'ebook' },
+          headers: { Origin: baseURL! },
+        })
+      ).status(),
+    ).toBe(401);
+    await anonymous.dispose();
+  },
+);
 
 test('ids and queries are validated before the API is called', async ({ page, baseURL }) => {
   const badId = await page.request.fetch('/api/library/books/..%2F..%2Fusers', {

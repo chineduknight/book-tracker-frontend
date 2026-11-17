@@ -103,7 +103,7 @@ async function ChooseCopy({ bookId, page }: { bookId: string; page: number }) {
             {copies.items.map((copy) => (
               <li
                 key={copy.id}
-                className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-4 @md:flex-row @md:items-center @md:justify-between"
               >
                 <div className="min-w-0">
                   <p className="font-medium wrap-anywhere text-ink">{copyName(copy)}</p>

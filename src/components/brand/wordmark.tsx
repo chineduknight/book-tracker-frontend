@@ -22,11 +22,29 @@ export function BrandMark({ className }: { className?: string }) {
   );
 }
 
-export function Wordmark({ className }: { className?: string }) {
+/**
+ * `collapsible` (inside the signed-in header's size container) turns the name into screen-reader
+ * text when the header is too narrow for it and the account button together, so the link keeps the
+ * accessible name "Avuneri" while only the logo tile shows.
+ */
+export function Wordmark({
+  className,
+  collapsible,
+}: {
+  className?: string;
+  collapsible?: boolean;
+}) {
   return (
     <span className={cn('flex items-center gap-2', className)}>
-      <BrandMark />
-      <span className="font-serif text-xl font-semibold tracking-tight text-ink">Avuneri</span>
+      <BrandMark className="shrink-0" />
+      <span
+        className={cn(
+          'font-serif text-xl font-semibold tracking-tight text-ink',
+          collapsible && '@max-[16rem]/header:sr-only',
+        )}
+      >
+        Avuneri
+      </span>
     </span>
   );
 }

@@ -109,6 +109,32 @@ describe('NoteForm', () => {
     );
   });
 
+  it('sends one request however many times it is submitted while waiting', async () => {
+    let answer: (response: Response) => void = () => {};
+    fetchMock.mockReturnValue(new Promise<Response>((resolve) => (answer = resolve)));
+    const { container } = render(
+      <NoteForm
+        initialBook={book}
+        initialSessions={{ items: [], page: 1, totalPages: 0 }}
+        initialSessionId=""
+      />,
+    );
+    (container.querySelector('input[value="note"]') as HTMLInputElement).checked = true;
+    (container.querySelector('textarea[name="content"]') as HTMLTextAreaElement).value = 'Once.';
+    const form = container.querySelector('form')!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(screen.getByRole('button', { name: 'Saving…' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    answer(json(201, { data: { ...note, id: 'c'.repeat(24) } }));
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    expect(writes()).toHaveLength(1);
+  });
+
   it('requires a kind and a book, and sends nothing until both are chosen', async () => {
     const user = userEvent.setup();
     render(<NoteForm initialBook={null} initialSessions={null} initialSessionId="" />);

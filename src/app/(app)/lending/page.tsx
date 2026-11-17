@@ -1,6 +1,6 @@
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
-import { Plus, Repeat, SearchX } from 'lucide-react';
+import { CalendarX, Plus, Repeat, SearchX } from 'lucide-react';
 import { LoanList } from '@/components/lending/loan-list';
 import { DataUnavailable } from '@/components/library/data-unavailable';
 import { Notice } from '@/components/library/notice';
@@ -40,8 +40,19 @@ export default async function LendingPage({ searchParams }: PageProps<'/lending'
   // One explicit reference day for counts, rows and labels: the chosen one, or today in UTC (the
   // API's own default), so the page never mixes two definitions of "overdue".
   const asOf = query.status === 'overdue' && query.asOf ? query.asOf : today;
-  const effective = { ...query, asOf: query.status === 'overdue' ? asOf : undefined };
-  const result = await loadAsReader((api) => loadLoanLedger(api, effective, asOf));
+  const effective = {
+    status: query.status,
+    sort: query.sort,
+    page: query.page,
+    asOf: query.status === 'overdue' ? asOf : undefined,
+  };
+  // A reference day that is not one valid day is reported, never replaced: no loans are loaded,
+  // so nothing can appear "overdue" under a day the reader did not ask for.
+  const rejectedAsOf = query.rejectedAsOf;
+  const result =
+    rejectedAsOf === undefined
+      ? await loadAsReader((api) => loadLoanLedger(api, effective, asOf))
+      : null;
   const { label, summary } = findDestination('/lending');
   const fieldClass =
     'min-h-11 w-full rounded-lg border border-line-strong bg-surface px-3 text-base text-ink';
@@ -61,11 +72,13 @@ export default async function LendingPage({ searchParams }: PageProps<'/lending'
         <ul className="flex flex-wrap gap-2">
           {LOAN_STATUSES.map((status) => {
             const isCurrent = status === query.status;
-            const count = result.status === 'ok' ? result.value.totals[status] : undefined;
+            const count = result?.status === 'ok' ? result.value.totals[status] : undefined;
+            // The Overdue tab keeps a chosen day, so its count and its destination agree.
+            const tabAsOf = status === 'overdue' && query.asOf ? query.asOf : undefined;
             return (
               <li key={status}>
                 <Link
-                  href={loanListHref({ status, sort: query.sort, page: 1 }) as Route}
+                  href={loanListHref({ status, sort: query.sort, page: 1, asOf: tabAsOf }) as Route}
                   aria-current={isCurrent ? 'page' : undefined}
                   className={cn(
                     'inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-medium',
@@ -118,7 +131,7 @@ export default async function LendingPage({ searchParams }: PageProps<'/lending'
               id="loan-as-of"
               name="asOf"
               type="date"
-              defaultValue={asOf}
+              defaultValue={rejectedAsOf === undefined ? asOf : undefined}
               aria-describedby="loan-as-of-hint"
               className={fieldClass}
             />
@@ -130,15 +143,23 @@ export default async function LendingPage({ searchParams }: PageProps<'/lending'
         >
           Apply
         </button>
-        <p id="loan-as-of-hint" className="basis-full text-xs text-ink-muted">
-          A loan is overdue when it is still out and its due day is before{' '}
-          <strong className="font-semibold text-ink">{formatCalendarDate(asOf)}</strong>
-          {asOf === today ? ' (today, as a UTC calendar day)' : ' (the day you chose)'}. Due on that
-          day is not yet overdue; a loan without a due day never is.
-        </p>
+        {rejectedAsOf === undefined ? (
+          <p id="loan-as-of-hint" className="basis-full text-xs text-ink-muted">
+            A loan is overdue when it is still out and its due day is before{' '}
+            <strong className="font-semibold text-ink">{formatCalendarDate(asOf)}</strong>
+            {asOf === today ? ' (today, as a UTC calendar day)' : ' (the day you chose)'}. Due on
+            that day is not yet overdue; a loan without a due day never is.
+          </p>
+        ) : (
+          <p id="loan-as-of-hint" className="basis-full text-xs text-ink-muted">
+            Choose a day, or reset to today (as a UTC calendar day).
+          </p>
+        )}
       </form>
 
-      {result.status !== 'ok' ? (
+      {rejectedAsOf !== undefined || result === null ? (
+        <RejectedReferenceDay value={rejectedAsOf ?? ''} />
+      ) : result.status !== 'ok' ? (
         <DataUnavailable
           what="loans"
           retryHref={loanListHref(effective)}
@@ -176,5 +197,43 @@ export default async function LendingPage({ searchParams }: PageProps<'/lending'
         </>
       )}
     </>
+  );
+}
+
+const SHOWN_REJECTED_LENGTH = 60;
+
+/**
+ * The overdue view was asked for a day that is not one valid calendar day. The rejected text is
+ * shown as plain text (React escapes it; it is never markup), shortened if very long.
+ */
+function RejectedReferenceDay({ value }: { value: string }) {
+  const shown =
+    value.length > SHOWN_REJECTED_LENGTH ? `${value.slice(0, SHOWN_REJECTED_LENGTH)}…` : value;
+  return (
+    <section
+      aria-labelledby="as-of-problem"
+      className="flex flex-col gap-3 rounded-xl border border-danger bg-danger-soft p-4 text-sm text-ink sm:p-5"
+    >
+      <h2 id="as-of-problem" className="flex items-center gap-2 font-serif text-lg font-semibold">
+        <CalendarX aria-hidden="true" className="size-5 shrink-0 text-danger" />
+        This reference day can’t be used
+      </h2>
+      <p>
+        {value === '' ? (
+          'The link asks for overdue loans without saying as of which day.'
+        ) : (
+          <>
+            The link asks for loans overdue as of <q className="font-mono wrap-anywhere">{shown}</q>
+            , which isn’t one calendar day written as year-month-day (for example 2026-03-16).
+          </>
+        )}{' '}
+        No loans are listed, so none are shown as overdue as of a different day.
+      </p>
+      <div>
+        <ButtonLink href={'/lending?status=overdue' as Route} variant="secondary">
+          Reset to today
+        </ButtonLink>
+      </div>
+    </section>
   );
 }

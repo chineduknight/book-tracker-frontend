@@ -21,7 +21,7 @@ export function LocationList({ locations }: { locations: StorageLocation[] }) {
               onDone={() => setEditingId(null)}
             />
           ) : (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-3 @md:flex-row @md:items-start @md:justify-between">
               <div className="min-w-0">
                 <p className="font-medium break-words text-ink">{location.name}</p>
                 {location.description ? (

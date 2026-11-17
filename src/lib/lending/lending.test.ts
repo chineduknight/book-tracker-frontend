@@ -160,9 +160,32 @@ describe('parseLoanListQuery', () => {
   });
 
   it('keeps asOf only for the overdue view, and only a real day', () => {
-    expect(parseLoanListQuery({ status: 'overdue', asOf: '2028-02-29' }).asOf).toBe('2028-02-29');
-    expect(parseLoanListQuery({ status: 'overdue', asOf: '2027-02-29' }).asOf).toBeUndefined();
-    expect(parseLoanListQuery({ status: 'all', asOf: '2026-01-01' }).asOf).toBeUndefined();
+    const leapDay = parseLoanListQuery({ status: 'overdue', asOf: '2028-02-29' });
+    expect([leapDay.asOf, leapDay.rejectedAsOf]).toEqual(['2028-02-29', undefined]);
+    const elsewhere = parseLoanListQuery({ status: 'all', asOf: '2026-01-01' });
+    expect([elsewhere.asOf, elsewhere.rejectedAsOf]).toEqual([undefined, undefined]);
+    // Not part of the address for other views, so a bad value there is simply ignored.
+    expect(
+      parseLoanListQuery({ status: 'returned', asOf: 'garbage' }).rejectedAsOf,
+    ).toBeUndefined();
+  });
+
+  it('reports, never replaces, an overdue reference day that is not one valid day', () => {
+    const cases: [string | string[], string][] = [
+      ['2027-02-29', '2027-02-29'],
+      ['2026-13-01', '2026-13-01'],
+      ['16/11/2026', '16/11/2026'],
+      ['', ''],
+      ['<script>alert(1)</script>', '<script>alert(1)</script>'],
+      [['2026-01-01', '2026-02-01'], '2026-01-01, 2026-02-01'],
+    ];
+    for (const [asOf, shown] of cases) {
+      expect(parseLoanListQuery({ status: 'overdue', asOf })).toMatchObject({
+        asOf: undefined,
+        rejectedAsOf: shown,
+      });
+    }
+    expect(parseLoanListQuery({ status: 'overdue' }).rejectedAsOf).toBeUndefined();
   });
 
   it('ignores repeated and unknown values, and round-trips canonical links', () => {

@@ -381,3 +381,74 @@ test.describe('visual walkthrough: lending and Home', () => {
     await page.screenshot({ path: 'screenshots/ld-mobile-320-home-200pct.png' });
   });
 });
+
+/** FE #20: the shell and critical screens at small widths and large text, and the fixed states. */
+test.describe('visual walkthrough: launch-readiness fixes', () => {
+  test.skip(({ isMobile }) => isMobile, 'captured once, from the desktop project');
+
+  test('shell, dialogs and corrected states', async ({ page, baseURL }) => {
+    test.slow();
+    const reading = await seedReadingAndNotes(page, baseURL!);
+    const lending = await seedLending(page, baseURL!);
+    const big = async () => {
+      await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
+    };
+    const shot = (name: string, fullPage = false) =>
+      page.screenshot({ path: `screenshots/qa-${name}.png`, fullPage });
+
+    const phones: [number, string, string, 'light' | 'dark'][] = [
+      [320, '/', 'home', 'light'],
+      [320, '/library', 'library', 'dark'],
+      [360, '/reading', 'reading', 'light'],
+      [390, '/lending?status=all', 'lending', 'dark'],
+    ];
+    for (const [width, path, name, scheme] of phones) {
+      await page.setViewportSize({ width, height: 740 });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto(path);
+      await big();
+      await shot(`mobile-${width}-${name}-200pct-${scheme}`);
+    }
+
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.setViewportSize({ width: 320, height: 740 });
+    await page.goto('/');
+    await big();
+    await page
+      .getByRole('banner')
+      .getByRole('button', { name: /^Account:/ })
+      .click();
+    await shot('mobile-320-account-menu-200pct');
+
+    await page.goto(`/reading/${reading.activeSessionId}`);
+    await big();
+    await page.getByRole('button', { name: 'Mark as finished…' }).click();
+    await shot('mobile-320-finish-dialog-200pct');
+    await page.goto(`/lending/${lending.activeLoanId}`);
+    await big();
+    await page.getByRole('button', { name: 'Mark returned…' }).click();
+    await shot('mobile-320-return-dialog-200pct');
+    await page.goto(`/notes/new?bookId=${reading.bookId}`);
+    await big();
+    await page.getByLabel('Your note').fill('A long draft. '.repeat(1400));
+    await shot('mobile-320-note-editor-200pct');
+
+    await page.setViewportSize({ width: 740, height: 360 });
+    await page.goto('/library');
+    await big();
+    await shot('landscape-740x360-library-200pct');
+    await page.setViewportSize({ width: 768, height: 900 });
+    await page.goto('/library');
+    await big();
+    await shot('tablet-768-library-200pct', true);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/lending?status=overdue&asOf=2027-02-29');
+    await shot('mobile-390-overdue-rejected-day');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/lending?status=overdue&asOf=2027-02-29');
+    await shot('desktop-1440-overdue-rejected-day');
+    await page.goto('/');
+    await shot('desktop-1440-home-tiles');
+  });
+});

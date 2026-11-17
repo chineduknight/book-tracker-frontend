@@ -114,6 +114,74 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+  cross-browser:
+    name: Critical path in Firefox and WebKit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      # Its own disposable session store and its own API process, so its sign-ups never count
+      # against the Chromium job's registration limit.
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27018:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      BACKEND_TEST_MONGODB_URI: mongodb://127.0.0.1:27018
+      E2E_SESSION_MONGODB_URI: mongodb://127.0.0.1:27018/avuneri-bff-e2e
+      BACKEND_DIR: ${{ github.workspace }}/.ci/book-tracker-backend
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out book-tracker-backend (pinned)
+        uses: actions/checkout@v7
+        with:
+          repository: chineduknight/book-tracker-backend
+          ref: fea9c12e218f0322714f3e1c3139e494cbf90204
+          path: .ci/book-tracker-backend
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc # Node 26.x
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            .ci/book-tracker-backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Install the API's dependencies
+        run: npm ci
+        working-directory: .ci/book-tracker-backend
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright Firefox and WebKit
+        run: npx playwright install --with-deps firefox webkit
+
+      - name: Record browser versions
+        run: >-
+          node -e "const pw = require('@playwright/test');
+          (async () => { for (const t of [pw.firefox, pw.webkit]) {
+          const b = await t.launch(); console.log(t.name(), b.version()); await b.close(); } })()"
+
+      - name: Browser tests (Firefox desktop, WebKit iPhone; critical path; real API and fake auth API)
+        run: npm run test:e2e:cross-browser
+
+      - name: Upload Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-cross-browser
+          path: playwright-report/
+          retention-days: 14
+
   secret-scan:
     name: Secret scan (full history)
     runs-on: ubuntu-latest

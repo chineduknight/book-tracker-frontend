@@ -166,7 +166,7 @@ export function BookForm({ book }: { book?: Book }) {
           </div>
         ) : null}
       </fieldset>
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 @md:grid-cols-2">
         <Input
           label="ISBN (optional)"
           name="isbn"

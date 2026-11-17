@@ -29,7 +29,7 @@ test.describe('signed out', () => {
 });
 
 test.describe('registration', () => {
-  test('creates an account and opens the signed-in app', async ({ page }) => {
+  test('creates an account and opens the signed-in app', { tag: '@critical' }, async ({ page }) => {
     const email = uniqueEmail();
     await page.goto('/register');
     await page.getByLabel('Name').fill('Grace Hopper');
@@ -72,7 +72,7 @@ test.describe('registration', () => {
 });
 
 test.describe('sign in', () => {
-  test('returns to the page the reader asked for', async ({ page }) => {
+  test('returns to the page the reader asked for', { tag: '@critical' }, async ({ page }) => {
     const { email } = await registerViaApi(page);
     await page.context().clearCookies();
 
@@ -123,7 +123,7 @@ test.describe('sign in', () => {
     await expect(page).toHaveURL('/');
   });
 
-  test('says when the email or password is wrong', async ({ page }) => {
+  test('says when the email or password is wrong', { tag: '@critical' }, async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('Email').fill(uniqueEmail());
     await page.getByLabel('Password', { exact: true }).fill('not the password');
@@ -162,24 +162,28 @@ test.describe('sign in', () => {
 });
 
 test.describe('signing out', () => {
-  test('ends the session; back navigation shows no private page', async ({ page }) => {
-    const { name } = await registerViaApi(page);
-    await page.goto('/');
-    await page.goto('/library');
-    await page.getByRole('button', { name: `Account: ${name}` }).click();
-    await page.getByRole('button', { name: 'Log out' }).click();
+  test(
+    'ends the session; back navigation shows no private page',
+    { tag: '@critical' },
+    async ({ page }) => {
+      const { name } = await registerViaApi(page);
+      await page.goto('/');
+      await page.goto('/library');
+      await page.getByRole('button', { name: `Account: ${name}` }).click();
+      await page.getByRole('button', { name: 'Log out' }).click();
 
-    await expect(page).toHaveURL('/login?signedOut=1');
-    await expect(
-      page.getByRole('status').filter({ hasText: 'You have signed out.' }),
-    ).toBeVisible();
+      await expect(page).toHaveURL('/login?signedOut=1');
+      await expect(
+        page.getByRole('status').filter({ hasText: 'You have signed out.' }),
+      ).toBeVisible();
 
-    await page.goBack();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in');
-    await expect(page.getByText(name)).toHaveCount(0);
-    await page.goto('/library');
-    await expect(page).toHaveURL('/login?next=%2Flibrary');
-  });
+      await page.goBack();
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in');
+      await expect(page.getByText(name)).toHaveCount(0);
+      await page.goto('/library');
+      await expect(page).toHaveURL('/login?next=%2Flibrary');
+    },
+  );
 
   test('the account menu works from the keyboard', async ({ page }) => {
     const { name } = await registerViaApi(page);
@@ -195,15 +199,19 @@ test.describe('signing out', () => {
 });
 
 test.describe('session lifetime', () => {
-  test('a session revoked at the API ends on the next page', async ({ page, request }) => {
-    const { email } = await registerViaApi(page);
-    await page.goto('/notes');
-    await revokeAtBackend(request, email);
-    await page.goto('/reading');
-    await expect(page).toHaveURL('/login?next=%2Freading');
-  });
+  test(
+    'a session revoked at the API ends on the next page',
+    { tag: '@critical' },
+    async ({ page, request }) => {
+      const { email } = await registerViaApi(page);
+      await page.goto('/notes');
+      await revokeAtBackend(request, email);
+      await page.goto('/reading');
+      await expect(page).toHaveURL('/login?next=%2Freading');
+    },
+  );
 
-  test('a session ends at its absolute expiry', async ({ page }) => {
+  test('a session ends at its absolute expiry', { tag: '@critical' }, async ({ page }) => {
     test.slow();
     await registerViaApi(page, { email: uniqueEmail('+shortsession') });
     await page.goto('/library');
@@ -213,26 +221,26 @@ test.describe('session lifetime', () => {
     await expect(page).toHaveURL('/login?next=%2Flibrary');
   });
 
-  test('concurrent tabs refresh one token at a time and stay signed in', async ({
-    page,
-    context,
-    request,
-  }) => {
-    test.slow();
-    const { email, name } = await registerViaApi(page, { email: uniqueEmail('+fastrefresh') });
-    const tabs = [page, ...(await Promise.all([1, 2, 3].map(() => context.newPage())))];
+  test(
+    'concurrent tabs refresh one token at a time and stay signed in',
+    { tag: '@critical' },
+    async ({ page, context, request }) => {
+      test.slow();
+      const { email, name } = await registerViaApi(page, { email: uniqueEmail('+fastrefresh') });
+      const tabs = [page, ...(await Promise.all([1, 2, 3].map(() => context.newPage())))];
 
-    for (let round = 0; round < 3; round += 1) {
-      // Each access token lives 2 s, so every round needs a refresh, raced by all four tabs.
-      await page.waitForTimeout(2_100);
-      await Promise.all(tabs.map((tab, index) => tab.goto(pages[index]!.path)));
-      for (const tab of tabs) {
-        await expect(tab.getByRole('button', { name: `Account: ${name}` })).toBeVisible();
+      for (let round = 0; round < 3; round += 1) {
+        // Each access token lives 2 s, so every round needs a refresh, raced by all four tabs.
+        await page.waitForTimeout(2_100);
+        await Promise.all(tabs.map((tab, index) => tab.goto(pages[index]!.path)));
+        for (const tab of tabs) {
+          await expect(tab.getByRole('button', { name: `Account: ${name}` })).toBeVisible();
+        }
       }
-    }
 
-    const stats = await backendStats(request, email);
-    expect(stats.reuseDetected).toBe(0);
-    expect(stats.refreshCalls).toBeGreaterThanOrEqual(3);
-  });
+      const stats = await backendStats(request, email);
+      expect(stats.reuseDetected).toBe(0);
+      expect(stats.refreshCalls).toBeGreaterThanOrEqual(3);
+    },
+  );
 });

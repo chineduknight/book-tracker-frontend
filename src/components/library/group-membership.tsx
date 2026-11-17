@@ -93,7 +93,7 @@ export function BookGroupsEditor({
           .
         </p>
       ) : available.length > 0 ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 @md:flex-row @md:items-end">
           <div className="sm:w-64">
             <Select
               label={`Add to a ${noun.one}`}

@@ -175,13 +175,13 @@ function BookDetails({ book }: { book: Book }) {
     ['Chapters', book.chapterCount],
   ];
   return (
-    <div className="flex flex-col gap-5 sm:flex-row">
+    <div className="flex flex-col gap-5 @md:flex-row">
       <BookCover className="w-20" />
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <div className="flex flex-wrap gap-2">
           <Badge>{FORMAT_LABELS[book.format]}</Badge>
         </div>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm @md:grid-cols-2">
           {facts
             .filter(([, value]) => value !== undefined)
             .map(([term, value]) => (

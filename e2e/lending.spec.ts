@@ -24,91 +24,94 @@ async function bookWithCopies(page: Page, origin: string, count: number) {
   return { id: book.id, title, copyIds };
 }
 
-test('lend a copy found past the first page, return it, and lend it again', async ({
-  page,
-  baseURL,
-}) => {
-  test.slow();
-  const book = await bookWithCopies(page, baseURL!, 21);
-  const borrower = uniqueWord('Ada');
+test(
+  'lend a copy found past the first page, return it, and lend it again',
+  { tag: '@critical' },
+  async ({ page, baseURL }) => {
+    test.slow();
+    const book = await bookWithCopies(page, baseURL!, 21);
+    const borrower = uniqueWord('Ada');
 
-  await page.goto('/lending/new');
-  await page.getByLabel('Which book are you lending?').fill(book.title);
-  await page.getByRole('button', { name: new RegExp(`^Choose ${book.title}`) }).click();
-  await expect(page).toHaveURL(`/lending/new?bookId=${book.id}`);
-  await expect(page.getByText('Page 1 of 2 · 21 copies')).toBeVisible();
-  await page.getByRole('link', { name: 'Next' }).click();
-  const row = page.getByRole('main').getByRole('listitem');
-  await expect(row).toHaveCount(1);
-  const copyLabel = (await row.locator('p').first().textContent())!.trim();
-  await row.getByRole('link', { name: `Lend this copy: ${copyLabel}` }).click();
+    await page.goto('/lending/new');
+    await page.getByLabel('Which book are you lending?').fill(book.title);
+    await page.getByRole('button', { name: new RegExp(`^Choose ${book.title}`) }).click();
+    await expect(page).toHaveURL(`/lending/new?bookId=${book.id}`);
+    await expect(page.getByText('Page 1 of 2 · 21 copies')).toBeVisible();
+    await page.getByRole('link', { name: 'Next' }).click();
+    const row = page.getByRole('main').getByRole('listitem');
+    await expect(row).toHaveCount(1);
+    const copyLabel = (await row.locator('p').first().textContent())!.trim();
+    await row.getByRole('link', { name: `Lend this copy: ${copyLabel}` }).click();
 
-  await expect(page).toHaveURL(/\/lending\/new\?copyId=[0-9a-f]{24}$/);
-  const copyId = new URL(page.url()).searchParams.get('copyId')!;
-  await expect(page.getByText('Not on loan right now.')).toBeVisible();
-  await page.getByLabel('Borrower').fill(borrower);
-  await page.getByLabel('Lent on').fill('2026-11-01');
-  await page.getByLabel('Due back (optional)').fill('2026-11-20');
-  await page.getByRole('button', { name: 'Record loan' }).click();
+    await expect(page).toHaveURL(/\/lending\/new\?copyId=[0-9a-f]{24}$/);
+    const copyId = new URL(page.url()).searchParams.get('copyId')!;
+    await expect(page.getByText('Not on loan right now.')).toBeVisible();
+    await page.getByLabel('Borrower').fill(borrower);
+    await page.getByLabel('Lent on').fill('2026-11-01');
+    await page.getByLabel('Due back (optional)').fill('2026-11-20');
+    await page.getByRole('button', { name: 'Record loan' }).click();
 
-  await expect(page).toHaveURL(/\/lending\/[0-9a-f]{24}\?notice=loan-created$/);
-  const loanPath = new URL(page.url()).pathname;
-  await expect(page.getByText('Loan recorded.')).toBeVisible();
-  await expect(page.getByText('Lent 1 Nov 2026 · Due 20 Nov 2026')).toBeVisible();
+    await expect(page).toHaveURL(/\/lending\/[0-9a-f]{24}\?notice=loan-created$/);
+    const loanPath = new URL(page.url()).pathname;
+    await expect(page.getByText('Loan recorded.')).toBeVisible();
+    await expect(page.getByText('Lent 1 Nov 2026 · Due 20 Nov 2026')).toBeVisible();
 
-  await page.goto('/lending');
-  await expect(page.getByRole('link', { name: borrower })).toBeVisible();
-  await page.getByRole('link', { name: borrower }).click();
+    await page.goto('/lending');
+    await expect(page.getByRole('link', { name: borrower })).toBeVisible();
+    await page.getByRole('link', { name: borrower }).click();
 
-  // Escape abandons the pending day; the reopened dialog starts empty.
-  const opener = page.getByRole('button', { name: 'Mark returned…' });
-  await opener.click();
-  const dialog = page.getByRole('dialog', { name: 'Mark this loan as returned?' });
-  await dialog.getByLabel('Returned on').fill('2026-11-09');
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(opener).toBeFocused();
-  await opener.click();
-  await expect(dialog.getByLabel('Returned on')).toHaveValue('');
-  await dialog.getByLabel('Returned on').fill('2026-11-10');
-  await dialog.getByRole('button', { name: 'Mark returned' }).click();
+    // Escape abandons the pending day; the reopened dialog starts empty.
+    const opener = page.getByRole('button', { name: 'Mark returned…' });
+    await opener.click();
+    const dialog = page.getByRole('dialog', { name: 'Mark this loan as returned?' });
+    await dialog.getByLabel('Returned on').fill('2026-11-09');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(opener).toBeFocused();
+    await opener.click();
+    await expect(dialog.getByLabel('Returned on')).toHaveValue('');
+    await dialog.getByLabel('Returned on').fill('2026-11-10');
+    await dialog.getByRole('button', { name: 'Mark returned' }).click();
 
-  await expect(page.getByText(/Marked returned/)).toBeVisible();
-  await expect(
-    page.getByText('Lent 1 Nov 2026 · Due 20 Nov 2026 · Returned 10 Nov 2026'),
-  ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mark returned…' })).toHaveCount(0);
+    await expect(page.getByText(/Marked returned/)).toBeVisible();
+    await expect(
+      page.getByText('Lent 1 Nov 2026 · Due 20 Nov 2026 · Returned 10 Nov 2026'),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Mark returned…' })).toHaveCount(0);
 
-  const loanId = loanPath.split('/').at(-1)!;
-  const same = await page.request.put(`/api/lending/loans/${loanId}/return`, {
-    headers: { Origin: baseURL! },
-    data: { returnedOn: '2026-11-10' },
-  });
-  expect(same.status()).toBe(200);
-  const other = await page.request.put(`/api/lending/loans/${loanId}/return`, {
-    headers: { Origin: baseURL! },
-    data: { returnedOn: '2026-11-11' },
-  });
-  expect(other.status()).toBe(409);
-  expect((await other.json()).error.code).toBe('LOAN_ALREADY_RETURNED');
+    const loanId = loanPath.split('/').at(-1)!;
+    const same = await page.request.put(`/api/lending/loans/${loanId}/return`, {
+      headers: { Origin: baseURL! },
+      data: { returnedOn: '2026-11-10' },
+    });
+    expect(same.status()).toBe(200);
+    const other = await page.request.put(`/api/lending/loans/${loanId}/return`, {
+      headers: { Origin: baseURL! },
+      data: { returnedOn: '2026-11-11' },
+    });
+    expect(other.status()).toBe(409);
+    expect((await other.json()).error.code).toBe('LOAN_ALREADY_RETURNED');
 
-  await page.reload();
-  await page.getByRole('link', { name: 'Record a new loan of this copy' }).click();
-  await expect(page).toHaveURL(`/lending/new?copyId=${copyId}`);
-  await page.getByLabel('Borrower').fill(`${borrower} again`);
-  await page.getByLabel('Lent on').fill('2026-11-12');
-  await page.getByRole('button', { name: 'Record loan' }).click();
-  await expect(page).toHaveURL(/notice=loan-created/);
+    await page.reload();
+    await page.getByRole('link', { name: 'Record a new loan of this copy' }).click();
+    await expect(page).toHaveURL(`/lending/new?copyId=${copyId}`);
+    await page.getByLabel('Borrower').fill(`${borrower} again`);
+    await page.getByLabel('Lent on').fill('2026-11-12');
+    await page.getByRole('button', { name: 'Record loan' }).click();
+    await expect(page).toHaveURL(/notice=loan-created/);
 
-  await page.getByRole('link', { name: 'This copy’s loans' }).click();
-  const loans = page.getByRole('main').getByRole('listitem');
-  await expect(loans).toHaveCount(2);
-  await expect(loans.filter({ hasText: borrower }).filter({ hasText: 'Returned' })).toHaveCount(1);
+    await page.getByRole('link', { name: 'This copy’s loans' }).click();
+    const loans = page.getByRole('main').getByRole('listitem');
+    await expect(loans).toHaveCount(2);
+    await expect(loans.filter({ hasText: borrower }).filter({ hasText: 'Returned' })).toHaveCount(
+      1,
+    );
 
-  await page.goto(`/library/books/${book.id}`);
-  await page.getByRole('button', { name: `Check loan status of ${copyLabel}` }).click();
-  await expect(page.getByText(`On loan to ${borrower} again since 12 Nov 2026.`)).toBeVisible();
-});
+    await page.goto(`/library/books/${book.id}`);
+    await page.getByRole('button', { name: `Check loan status of ${copyLabel}` }).click();
+    await expect(page.getByText(`On loan to ${borrower} again since 12 Nov 2026.`)).toBeVisible();
+  },
+);
 
 test('refuses incomplete loans, never duplicates a loan, and is honest about unknown outcomes', async ({
   page,
@@ -220,6 +223,18 @@ test('overdue follows the stated reference day; due on that day is not overdue',
   await page.getByRole('button', { name: 'Apply' }).click();
   await expect(page.getByRole('link', { name: late })).toBeVisible();
 
+  // The chosen day survives a change of order, and the Overdue tab (whose count used it) keeps it.
+  await page.getByLabel('Order', { exact: true }).selectOption('oldest');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page).toHaveURL(
+    (url) =>
+      url.searchParams.get('asOf') === '2026-01-11' && url.searchParams.get('sort') === 'oldest',
+  );
+  await expect(page.getByText('(the day you chose)')).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Loan status' }).getByRole('link', { name: /^Overdue/ }),
+  ).toHaveAttribute('href', /asOf=2026-01-11/);
+
   await page
     .getByRole('navigation', { name: 'Loan status' })
     .getByRole('link', { name: /^Returned/ })
@@ -238,6 +253,53 @@ test('overdue follows the stated reference day; due on that day is not overdue',
   await page.goto('/lending?page=999');
   await expect(page.getByText('There are no loans on this page')).toBeVisible();
 });
+
+test(
+  'a reference day that is not one valid day is reported, never replaced by today',
+  { tag: '@critical' },
+  async ({ page }) => {
+    let dialogs = 0;
+    page.on('dialog', (dialog) => {
+      dialogs += 1;
+      void dialog.dismiss();
+    });
+    const problem = page.getByRole('region', { name: 'This reference day can’t be used' });
+    const cases: [string, string][] = [
+      ['asOf=2027-02-29', '2027-02-29'],
+      ['asOf=16-11-2026', '16-11-2026'],
+      [
+        `asOf=${encodeURIComponent('<img src=x onerror=alert(1)>')}`,
+        '<img src=x onerror=alert(1)>',
+      ],
+      ['asOf=2026-01-10&asOf=2026-01-11', '2026-01-10, 2026-01-11'],
+    ];
+    for (const [query, shown] of cases) {
+      await page.goto(`/lending?status=overdue&${query}`);
+      await expect(problem).toBeVisible();
+      await expect(problem.locator('q')).toHaveText(shown);
+      // Nothing is listed, and nothing claims to be "as of today".
+      await expect(page.getByText('(today, as a UTC calendar day)')).toHaveCount(0);
+      await expect(page.getByText('(the day you chose)')).toHaveCount(0);
+      await expect(page.getByRole('main').locator('img')).toHaveCount(0);
+      await expect(page.getByLabel('Overdue as of')).toHaveValue('');
+    }
+    expect(dialogs).toBe(0);
+
+    // An empty day (what the form sends when the date is cleared) is reported too, rather than
+    // quietly meaning "today". Loaded directly: emulated iOS date fields cannot be cleared by script.
+    await page.goto('/lending?status=overdue&asOf=');
+    await expect(problem).toContainText('without saying as of which day');
+
+    await problem.getByRole('link', { name: 'Reset to today' }).click();
+    await expect(page).toHaveURL('/lending?status=overdue');
+    await expect(problem).toHaveCount(0);
+    await expect(page.getByText('(today, as a UTC calendar day)')).toBeVisible();
+
+    // Other views do not use a reference day, so a stray one is simply ignored there.
+    await page.goto('/lending?status=returned&asOf=nonsense');
+    await expect(problem).toHaveCount(0);
+  },
+);
 
 test('a loan outlives its book: still listed, readable and returnable', async ({
   page,

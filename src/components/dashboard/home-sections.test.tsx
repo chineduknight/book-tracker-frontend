@@ -46,6 +46,20 @@ describe('Home sections', () => {
     );
   });
 
+  it('says so when a tile counts one thing and opens a list of another', () => {
+    render(<AtAGlance data={ok(summary)} />);
+    // Books are counted once; the destination lists readings, so rereads appear separately.
+    const finished = screen.getByRole('link', { name: /^Books ever finished/ });
+    expect(finished).toHaveAttribute('href', '/reading?status=completed');
+    expect(finished).toHaveAccessibleName(
+      'Books ever finished 2 Each book counted once, even if reread now Opens finished readings, where each reread is listed',
+    );
+    const copies = screen.getByRole('link', { name: /^Physical copies/ });
+    expect(copies).toHaveAccessibleName(/Opens your physical books, each with its copies$/);
+    // Tiles whose destination lists exactly what is counted say nothing extra.
+    expect(screen.getByRole('link', { name: /^Reading now/ })).not.toHaveTextContent(/Opens/);
+  });
+
   it('shows an outage as an error, never as a wall of zeroes', () => {
     const { container } = render(
       <>

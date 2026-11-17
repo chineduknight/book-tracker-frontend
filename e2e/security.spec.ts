@@ -48,7 +48,7 @@ test('the browser talks only to this app, never to the API', async ({ page }) =>
   expect(requests.filter((url) => new URL(url).pathname.startsWith('/api/v1'))).toEqual([]);
 });
 
-test('backend tokens never reach the browser', async ({ page, request }) => {
+test('backend tokens never reach the browser', { tag: '@critical' }, async ({ page, request }) => {
   const bodies: string[] = [];
   page.on('response', async (response) => {
     if (new URL(response.url()).origin !== APP_ORIGIN) return;
@@ -93,15 +93,19 @@ test('backend tokens never reach the browser', async ({ page, request }) => {
 });
 
 test.describe('CSRF', () => {
-  test('a cross-site form post cannot sign a reader out', async ({ page }) => {
-    const { name } = await registerViaApi(page);
-    await page.goto(
-      `${FAKE_API}/__test/csrf-form?target=${encodeURIComponent(`${APP_ORIGIN}/api/session/logout`)}`,
-    );
-    await page.waitForLoadState('networkidle');
-    await page.goto('/');
-    await expect(page.getByRole('button', { name: `Account: ${name}` })).toBeVisible();
-  });
+  test(
+    'a cross-site form post cannot sign a reader out',
+    { tag: '@critical' },
+    async ({ page }) => {
+      const { name } = await registerViaApi(page);
+      await page.goto(
+        `${FAKE_API}/__test/csrf-form?target=${encodeURIComponent(`${APP_ORIGIN}/api/session/logout`)}`,
+      );
+      await page.waitForLoadState('networkidle');
+      await page.goto('/');
+      await expect(page.getByRole('button', { name: `Account: ${name}` })).toBeVisible();
+    },
+  );
 
   for (const origin of ['https://evil.example', 'null']) {
     test(`session requests from origin ${origin} are refused`, async ({ page }) => {
@@ -136,42 +140,53 @@ test('pages and session responses are never cacheable', async ({ page }) => {
   }
   const me = await page.request.get('/api/session/me');
   expect(me.headers()['cache-control']).toBe('no-store');
+  expect(me.headers()['x-robots-tag']).toBe('noindex, nofollow, noarchive');
   await expect(me.json()).resolves.toEqual({
     data: { user: { name: 'Ada Lovelace', email: expect.any(String) } },
   });
 });
 
-test('security headers and an enforced CSP apply without breaking the app', async ({ page }) => {
-  const violations = await watchCspViolations(page);
-  const response = await page.goto('/login');
-  const headers = response!.headers();
-  const csp = headers['content-security-policy'] ?? '';
-  expect(csp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
-  expect(csp).not.toContain('unsafe-eval');
-  expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/);
-  for (const directive of [
-    "object-src 'none'",
-    "base-uri 'none'",
-    "frame-ancestors 'none'",
-    "form-action 'self'",
-    "connect-src 'self'",
-  ]) {
-    expect(csp).toContain(directive);
-  }
-  expect(headers['x-content-type-options']).toBe('nosniff');
-  expect(headers['x-frame-options']).toBe('DENY');
-  expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
-  expect(headers['x-powered-by']).toBeUndefined();
+test(
+  'security headers and an enforced CSP apply without breaking the app',
+  { tag: '@critical' },
+  async ({ page }) => {
+    const violations = await watchCspViolations(page);
+    const response = await page.goto('/login');
+    const headers = response!.headers();
+    const csp = headers['content-security-policy'] ?? '';
+    expect(csp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
+    expect(csp).not.toContain('unsafe-eval');
+    expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/);
+    for (const directive of [
+      "object-src 'none'",
+      "base-uri 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "connect-src 'self'",
+    ]) {
+      expect(csp).toContain(directive);
+    }
+    expect(headers['x-content-type-options']).toBe('nosniff');
+    expect(headers['x-frame-options']).toBe('DENY');
+    expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+    expect(headers['x-powered-by']).toBeUndefined();
+    // Private app: never indexed, by header and by meta tag.
+    expect(headers['x-robots-tag']).toBe('noindex, nofollow, noarchive');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      'content',
+      /noindex, nofollow/,
+    );
 
-  // Hydration works under the policy: the client-side form validation runs.
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByLabel('Email')).toBeFocused();
-  await registerViaApi(page);
-  await page.goto('/');
-  await page.getByRole('button', { name: /^Account:/ }).click();
-  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
-  expect(await violations()).toEqual([]);
-});
+    // Hydration works under the policy: the client-side form validation runs.
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page.getByLabel('Email')).toBeFocused();
+    await registerViaApi(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: /^Account:/ }).click();
+    await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+    expect(await violations()).toEqual([]);
+  },
+);
 
 test('each response gets a fresh nonce', async ({ request }) => {
   const nonceOf = async () =>

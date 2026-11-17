@@ -61,7 +61,7 @@ export function CopiesManager({ bookId, copies, locations }: CopiesManagerProps)
                   onDone={() => setEditingId(null)}
                 />
               ) : (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-3 @md:flex-row @md:items-start @md:justify-between">
                   <div className="min-w-0">
                     <p className="font-medium break-words text-ink">{copyName(copy)}</p>
                     <p className="text-xs text-ink-muted">Added {copyAddedOn(copy)}</p>
@@ -179,7 +179,7 @@ function CopyForm({
       className="flex flex-col gap-4"
     >
       <ActionError error={error} errorRef={errorRef} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 @md:grid-cols-2">
         <Input
           label="Label (optional)"
           name="label"
