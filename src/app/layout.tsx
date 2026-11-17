@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description:
     'Avuneri is a private library and reading companion: your books, your reading, your notes and your loans.',
   applicationName: 'Avuneri',
-  // A private app: keep every page out of search engines.
+  // A private app: keep every page out of search engines (also X-Robots-Tag, next.config.ts).
   robots: { index: false, follow: false },
 };
 

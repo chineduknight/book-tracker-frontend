@@ -140,6 +140,7 @@ test('pages and session responses are never cacheable', async ({ page }) => {
   }
   const me = await page.request.get('/api/session/me');
   expect(me.headers()['cache-control']).toBe('no-store');
+  expect(me.headers()['x-robots-tag']).toBe('noindex, nofollow, noarchive');
   await expect(me.json()).resolves.toEqual({
     data: { user: { name: 'Ada Lovelace', email: expect.any(String) } },
   });
@@ -169,6 +170,12 @@ test(
     expect(headers['x-frame-options']).toBe('DENY');
     expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(headers['x-powered-by']).toBeUndefined();
+    // Private app: never indexed, by header and by meta tag.
+    expect(headers['x-robots-tag']).toBe('noindex, nofollow, noarchive');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      'content',
+      /noindex, nofollow/,
+    );
 
     // Hydration works under the policy: the client-side form validation runs.
     await page.getByRole('button', { name: 'Sign in' }).click();
