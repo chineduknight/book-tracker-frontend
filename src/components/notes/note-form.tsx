@@ -209,9 +209,9 @@ export function NoteForm({
                 value={value}
                 onChange={() => setKind(value)}
                 data-invalid={errors.kind && value === 'note' ? 'true' : undefined}
-                className="mt-0.5 size-4 accent-[var(--accent)]"
+                className="mt-0.5 size-4 shrink-0 accent-[var(--accent)]"
               />
-              <span className="flex min-w-0 flex-col">
+              <span className="flex min-w-0 flex-col wrap-break-word">
                 <span className="font-medium text-ink">{NOTE_KIND_LABELS[value]}</span>
                 <span className="text-ink-muted">{KIND_DESCRIPTIONS[value]}</span>
               </span>

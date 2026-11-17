@@ -78,6 +78,26 @@ describe('NewLoanForm', () => {
     );
   });
 
+  it('sends one request however many times it is submitted while waiting', async () => {
+    let answer: (response: Response) => void = () => {};
+    fetchMock.mockReturnValue(new Promise<Response>((resolve) => (answer = resolve)));
+    const { container } = render(<NewLoanForm copyId={loan.copyId} bookId={loan.bookId} />);
+    (container.querySelector('input[name="borrowerName"]') as HTMLInputElement).value = 'Ada';
+    (container.querySelector('input[name="lentOn"]') as HTMLInputElement).value = '2026-03-01';
+    const form = container.querySelector('form')!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    fireEvent.submit(form);
+    fireEvent.click(screen.getByRole('button', { name: 'Saving…' }));
+    expect(screen.getByRole('button', { name: 'Saving…' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    answer(json(201, { data: loan }));
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    expect(writes()).toHaveLength(1);
+  });
+
   it('refuses a missing lent day and a due day before it, sending nothing', async () => {
     const user = userEvent.setup();
     render(<NewLoanForm copyId={loan.copyId} bookId={loan.bookId} />);
