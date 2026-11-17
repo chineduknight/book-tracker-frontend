@@ -28,12 +28,39 @@ function leavingHref(event: MouseEvent): string | null {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/** Where the reader was going when the guard stopped them. */
+type Pending = { kind: 'link'; href: string } | { kind: 'traverse'; key: string };
+
+/**
+ * A browser Back or Forward to another page of this app, i.e. one that would discard the form.
+ * Only traversals the browser lets the page cancel are considered: same-document ones (the app's
+ * own history entries) after the reader has interacted with the page. Others go ahead as usual;
+ * leaving the document still triggers the browser's own unload prompt.
+ */
+function leavingTraversal(event: NavigateEvent): string | null {
+  if (event.navigationType !== 'traverse' || !event.cancelable) return null;
+  if (!event.destination.sameDocument) return null;
+  const url = new URL(event.destination.url);
+  if (url.origin !== window.location.origin) return null;
+  // Moving between entries of this same page (an in-page #anchor) loses nothing.
+  if (url.pathname === window.location.pathname && url.search === window.location.search) {
+    return null;
+  }
+  return event.destination.key;
+}
+
 /**
  * Warns before unsaved form text is abandoned: in-app links (including the navigation bar and
- * Cancel) ask first in an accessible dialog, and reloading or closing the tab triggers the
- * browser's own prompt. Dirtiness is read from the fields themselves, so text typed before the page
- * became interactive counts too. There is no autosave: nothing is stored until the reader saves.
- * Browser back/forward within the app is not intercepted (documented limitation).
+ * Cancel) and the browser's Back and Forward within the app ask first in an accessible dialog, and
+ * reloading or closing the tab triggers the browser's own prompt. Dirtiness is read from the fields
+ * themselves, so text typed before the page became interactive counts too. There is no autosave:
+ * nothing is stored until the reader saves.
+ *
+ * Back and Forward use the Navigation API's cancelable traversals: no history entries are added
+ * and nothing is rewritten, so the reader can never be trapped (browsers allow a page to cancel a
+ * traversal only after a user interaction, and "Discard changes" completes it). Where the API is
+ * missing or the browser does not let the traversal be cancelled, Back and Forward behave as
+ * before and the form is discarded (see docs/launch-readiness.md).
  */
 export function useUnsavedChanges<FormValues extends Values<FormValues>>(
   formRef: RefObject<HTMLFormElement | null>,
@@ -43,7 +70,7 @@ export function useUnsavedChanges<FormValues extends Values<FormValues>>(
   const router = useRouter();
   const [initial] = useState(initialValues);
   const [isDirty, setIsDirty] = useState(false);
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const released = useRef(false);
 
   useEffect(() => {
@@ -71,13 +98,23 @@ export function useUnsavedChanges<FormValues extends Values<FormValues>>(
       if (!href) return;
       event.preventDefault();
       event.stopPropagation();
-      setPendingHref(href);
+      setPending({ kind: 'link', href });
     };
+    const onNavigate = (event: NavigateEvent) => {
+      if (released.current) return;
+      const key = leavingTraversal(event);
+      if (key === null) return;
+      event.preventDefault();
+      setPending({ kind: 'traverse', key });
+    };
+    const history = typeof window.navigation === 'undefined' ? null : window.navigation;
     window.addEventListener('beforeunload', onBeforeUnload);
     document.addEventListener('click', onClick, true);
+    history?.addEventListener('navigate', onNavigate);
     return () => {
       window.removeEventListener('beforeunload', onBeforeUnload);
       document.removeEventListener('click', onClick, true);
+      history?.removeEventListener('navigate', onNavigate);
     };
   }, [isDirty]);
 
@@ -88,18 +125,25 @@ export function useUnsavedChanges<FormValues extends Values<FormValues>>(
 
   const dialog = (
     <ConfirmDialog
-      open={pendingHref !== null}
+      open={pending !== null}
       title="Discard unsaved changes?"
       confirmLabel="Discard changes"
       cancelLabel="Keep editing"
       pendingLabel="Leaving…"
       isPending={false}
-      onCancel={() => setPendingHref(null)}
+      onCancel={() => setPending(null)}
       onConfirm={() => {
-        const href = pendingHref;
+        const destination = pending;
         released.current = true;
-        setPendingHref(null);
-        if (href) router.push(href as Route);
+        setPending(null);
+        if (destination?.kind === 'link') router.push(destination.href as Route);
+        // Completes the Back or Forward the reader asked for; the app's router follows it.
+        if (destination?.kind === 'traverse') {
+          const traversal = window.navigation?.traverseTo(destination.key);
+          // A traversal superseded by another navigation rejects; there is nothing to report.
+          traversal?.committed?.catch(() => undefined);
+          traversal?.finished?.catch(() => undefined);
+        }
       }}
     >
       <p>
