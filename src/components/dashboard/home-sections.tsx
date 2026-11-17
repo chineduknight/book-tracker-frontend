@@ -59,15 +59,22 @@ export function QuickActions() {
   );
 }
 
+/**
+ * A count that links to where it comes from. When the destination lists something other than what
+ * is counted (readings rather than books, books rather than copies), `destination` says so in the
+ * link itself, so the number and the page it opens never appear to disagree.
+ */
 function Tile({
   label,
   value,
   detail,
+  destination,
   href,
 }: {
   label: string;
   value: number;
   detail?: string | undefined;
+  destination?: string | undefined;
   href: string;
 }) {
   return (
@@ -76,11 +83,18 @@ function Tile({
         href={href as Route}
         className="flex h-full min-h-11 flex-col gap-1 rounded-xl border border-line bg-surface p-4 hover:border-line-strong"
       >
-        <span className="text-sm wrap-anywhere text-ink-muted">{label}</span>
+        {/* The spaces between parts keep the link's accessible name readable ("… finished 2 Each
+            book …"); between flex items they take no room. */}
+        <span className="text-sm wrap-anywhere text-ink-muted">{label}</span>{' '}
         <span className="font-serif text-3xl font-semibold text-ink tabular-nums">
           {value.toLocaleString('en')}
-        </span>
-        {detail ? <span className="text-xs wrap-anywhere text-ink-muted">{detail}</span> : null}
+        </span>{' '}
+        {detail ? <span className="text-xs wrap-anywhere text-ink-muted">{detail}</span> : null}{' '}
+        {destination ? (
+          <span className="mt-auto pt-1 text-xs font-medium wrap-anywhere text-accent">
+            {destination}
+          </span>
+        ) : null}
       </Link>
     </li>
   );
@@ -117,7 +131,7 @@ function GlanceTiles({ summary }: { summary: DashboardSummary }) {
           to start tracking reading, notes and loans.
         </p>
       ) : null}
-      <ul className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-4">
+      <ul className="grid grid-cols-1 gap-3 @xs:grid-cols-2 @2xl:grid-cols-4">
         <Tile
           label="Books"
           value={catalogue.totalBooks}
@@ -127,6 +141,7 @@ function GlanceTiles({ summary }: { summary: DashboardSummary }) {
         <Tile
           label="Physical copies"
           value={catalogue.physicalCopies}
+          destination="Opens your physical books, each with its copies"
           href="/library?format=physical"
         />
         <Tile
@@ -138,7 +153,8 @@ function GlanceTiles({ summary }: { summary: DashboardSummary }) {
         <Tile
           label="Books ever finished"
           value={reading.booksEverCompleted}
-          detail="At least one finished reading, even if reread now"
+          detail="Each book counted once, even if reread now"
+          destination="Opens finished readings, where each reread is listed"
           href="/reading?status=completed"
         />
         <Tile
@@ -334,7 +350,7 @@ export function RecentActivity({ data }: { data: ReaderData<ActivityItem[]> }) {
           {data.value.map((item) => (
             <li
               key={`${item.activity.type}-${item.activity.resourceId}`}
-              className="flex flex-col gap-0.5 px-4 py-3 text-sm sm:flex-row sm:items-baseline sm:justify-between sm:gap-4"
+              className="flex flex-col gap-0.5 px-4 py-3 text-sm @md:flex-row @md:items-baseline @md:justify-between @md:gap-4"
             >
               <span className="min-w-0 wrap-anywhere">
                 <span className="font-medium text-ink">{ACTIVITY_LABELS[item.activity.type]}</span>
