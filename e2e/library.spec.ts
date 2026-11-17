@@ -75,6 +75,8 @@ test(
     await page.goto('/library/collections');
     await page.getByLabel('Collection name').fill(`Reading list ${word}`);
     await page.getByRole('button', { name: 'Add collection' }).click();
+    // Wait for the save (and the page refresh it triggers) before navigating away.
+    await expect(page.getByRole('link', { name: `Reading list ${word}` })).toBeVisible();
     await page.goto(bookUrl);
     await page.getByLabel('Add to a category').selectOption({ label: 'Philosophy' });
     await page.getByRole('button', { name: 'Add', exact: true }).first().click();
