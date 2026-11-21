@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { WholeNumberInput } from '@/components/ui/whole-number-input';
 import type { FieldErrors } from '@/lib/library/form-values';
 import type { NoteEditValues, NoteField } from '@/lib/notes/note-form';
 import { NOTE_LIMITS, type NoteKind } from '@/lib/notes/rules';
@@ -89,11 +90,10 @@ export function NoteTextFields({
           defaultValue={initial.chapter}
           error={errors.chapter}
         />
-        <Input
+        <WholeNumberInput
           label="Page (optional)"
+          max={NOTE_LIMITS.pageNumber}
           name="pageNumber"
-          inputMode="numeric"
-          autoComplete="off"
           hint="A page reference only; it doesn’t change your reading progress."
           defaultValue={initial.pageNumber}
           error={errors.pageNumber}

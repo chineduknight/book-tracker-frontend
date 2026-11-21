@@ -8,6 +8,7 @@ import { EmptyState } from './empty-state';
 import { InlineError } from './inline-error';
 import { Input } from './input';
 import { Skeleton } from './skeleton';
+import { keepDigits, WholeNumberInput } from './whole-number-input';
 
 describe('Button', () => {
   it('is a real button that does not submit forms by default', async () => {
@@ -118,5 +119,33 @@ describe('LinkCard', () => {
     expect(screen.getByRole('link', { name: 'Reading' })).toHaveAttribute('href', '/reading');
     expect(screen.getByRole('heading', { level: 3, name: 'Reading' })).toBeInTheDocument();
     expect(screen.getByText('Coming soon')).toBeInTheDocument();
+  });
+});
+
+describe('WholeNumberInput', () => {
+  it('accepts digits only, whether typed or pasted, and caps the length at the maximum', async () => {
+    const user = userEvent.setup();
+    render(<WholeNumberInput label="Pages (optional)" name="pageCount" max={100_000} />);
+    const field = screen.getByLabelText('Pages (optional)');
+    expect(field).toHaveAttribute('inputmode', 'numeric');
+    await user.type(field, '1a2-3.4 e');
+    expect(field).toHaveValue('1234');
+    await user.clear(field);
+    await user.click(field);
+    await user.paste(' 320 pages ');
+    expect(field).toHaveValue('320');
+    await user.clear(field);
+    await user.type(field, '12345678');
+    expect(field).toHaveValue('123456');
+  });
+
+  it('keeps the caret where the reader was typing', () => {
+    render(<WholeNumberInput label="Amount" name="progressValue" max={100_000} />);
+    const field = screen.getByLabelText<HTMLInputElement>('Amount');
+    field.value = '12x34';
+    field.setSelectionRange(3, 3); // just after the "x"
+    keepDigits(field);
+    expect(field.value).toBe('1234');
+    expect(field.selectionStart).toBe(2);
   });
 });

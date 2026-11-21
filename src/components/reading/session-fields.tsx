@@ -1,8 +1,9 @@
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { WholeNumberInput } from '@/components/ui/whole-number-input';
 import type { FieldErrors } from '@/lib/library/form-values';
-import { PROGRESS_UNITS, PROGRESS_UNIT_LABELS, RATINGS } from '@/lib/reading/rules';
+import { PROGRESS_MAX, PROGRESS_UNITS, PROGRESS_UNIT_LABELS, RATINGS } from '@/lib/reading/rules';
 import {
   progressHint,
   type BookLengths,
@@ -55,11 +56,10 @@ export function SessionFields({
               </option>
             ))}
           </Select>
-          <Input
+          <WholeNumberInput
             label="Amount"
+            max={PROGRESS_MAX.pages}
             name="progressValue"
-            inputMode="numeric"
-            autoComplete="off"
             defaultValue={initial.progressValue}
             error={errors.progressValue}
           />

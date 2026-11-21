@@ -111,7 +111,10 @@ describe('BookForm', () => {
   it('shows field errors from validation without calling the BFF', async () => {
     const user = userEvent.setup();
     render(<BookForm />);
-    await user.type(screen.getByLabelText('Pages (optional)'), 'many');
+    const pages = screen.getByLabelText('Pages (optional)');
+    await user.type(pages, 'many');
+    expect(pages).toHaveValue(''); // letters never reach the field
+    await user.type(pages, '0');
     await user.click(screen.getByRole('button', { name: 'Add book' }));
     expect(screen.getByLabelText('Title')).toHaveFocus();
     expect(screen.getByLabelText('Pages (optional)')).toHaveAccessibleDescription(/whole number/);

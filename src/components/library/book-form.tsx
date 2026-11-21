@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { WholeNumberInput } from '@/components/ui/whole-number-input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   bookChanges,
@@ -181,24 +182,24 @@ export function BookForm({ book }: { book?: Book }) {
           defaultValue={initial.edition}
           error={errors.edition}
         />
-        <Input
+        <WholeNumberInput
           label="Publication year (optional)"
+          max={LIMITS.publicationYear}
           name="publicationYear"
-          inputMode="numeric"
           defaultValue={initial.publicationYear}
           error={errors.publicationYear}
         />
-        <Input
+        <WholeNumberInput
           label="Pages (optional)"
+          max={LIMITS.pageCount}
           name="pageCount"
-          inputMode="numeric"
           defaultValue={initial.pageCount}
           error={errors.pageCount}
         />
-        <Input
+        <WholeNumberInput
           label="Chapters (optional)"
+          max={LIMITS.chapterCount}
           name="chapterCount"
-          inputMode="numeric"
           defaultValue={initial.chapterCount}
           error={errors.chapterCount}
         />
