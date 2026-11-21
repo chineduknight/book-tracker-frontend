@@ -158,7 +158,8 @@ docs/                    decisions and the auth/session architecture
 ## Design
 
 A quiet, modern reading room: warm paper canvas, dark ink text, one deep green accent, serif
-headings and a system sans body. There are no remote fonts, no images beyond icons and no analytics.
+headings and a system sans body. There are no remote fonts and no analytics; the only remote images are book covers, loaded from
+the https address the reader saved, without a referrer.
 Every colour is a token in [`globals.css`](src/app/globals.css) with light and dark values that
 follow the system preference. On phones a fixed bottom bar holds the five labelled tabs; from 768px
 a sidebar does. See [docs/decisions.md](docs/decisions.md).

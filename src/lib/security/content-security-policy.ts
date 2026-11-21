@@ -14,7 +14,9 @@ export function contentSecurityPolicy(options: {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ''}`,
     `style-src 'self' 'nonce-${nonce}'`,
-    "img-src 'self' data:",
+    // Book covers are shown from the https address the reader saved (never http, never inline
+    // script): the reader's browser fetches them directly from that site.
+    "img-src 'self' data: https:",
     "font-src 'self'",
     "connect-src 'self'",
     "manifest-src 'self'",

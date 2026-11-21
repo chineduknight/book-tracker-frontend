@@ -7,7 +7,8 @@ sessions), with the reasoning, so later milestones can build on them or revisit 
 
 The product is **Avuneri**. Repository and package names stay `book-tracker-frontend` and
 `book-tracker-backend`. Branding is a typographic wordmark plus a simple open-book mark in the
-existing palette; there are no remote fonts or images.
+existing palette; there are no remote fonts. The only remote images are book covers the reader
+chose (see “Book covers” below).
 
 ## Separate repository
 
@@ -180,6 +181,25 @@ decisions:
   where each reread is listed") rather than adding a unique-books view the API does not offer.
 - **Firefox and WebKit run the `@critical` journeys in a separate CI job** with its own API process,
   because the API limits registrations per process.
+
+## Book covers (owner decision, 2026-11-21)
+
+A book's cover is shown from the `https:` address the reader saved, in place of the placeholder.
+Until then reader-supplied URLs were only links, because loading an image makes the reader's
+browser contact that site. The owner chose to show covers, with these limits:
+
+- **The reader's browser fetches the image directly; Avuneri never downloads, proxies or stores
+  it** (no Next.js image optimisation, which would fetch it server-side and add cost).
+- **That site learns the reader's IP address and when the cover was viewed.** It is never told
+  which Avuneri page asked: images use `referrerpolicy="no-referrer"`, and the app-wide
+  `Referrer-Policy` is `strict-origin-when-cross-origin` anyway. Images below the fold load only
+  when scrolled to.
+- **https only.** The CSP's `img-src` is `'self' data: https:`; plain `http:` covers show the
+  placeholder (an https site would block them as mixed content) but stay available as a link.
+- **Failure is quiet:** a missing or broken image falls back to the placeholder, including one that
+  failed before the page became interactive. Covers are decorative (`alt=""`): the title is always
+  beside them.
+- Wishlist items keep their cover as a link only, for now.
 
 ## API transport
 

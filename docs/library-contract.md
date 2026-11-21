@@ -67,8 +67,9 @@ schemas. CI tests against that exact commit.
   (common on a slow phone) is never wiped by React re-rendering a controlled input. Browser tests
   hold back the JavaScript, type, then release it to prove this.
 - **Reader text is text.** Titles, descriptions and notes render as React text, never HTML.
-  Reader-supplied cover and source URLs are never fetched or shown as images (the CSP allows only
-  this origin). They appear only as validated http(s) links with `rel="noopener noreferrer nofollow"`.
+  Source URLs appear only as validated http(s) links with `rel="noopener noreferrer nofollow"`. A
+  book's cover URL is also shown as its cover image when it is `https:` (since 2026-11-21; see
+  decisions.md, “Book covers”); it stays available as a link too.
 - **Errors.** 404 messages are an allowlist of the API's fixed resource messages (so another
   reader's record is indistinguishable from a missing one). Name conflicts keep the API's fixed
   sentence. Unknown 409s, 5xx, protocol and network failures become a generic 503. A 401 from the

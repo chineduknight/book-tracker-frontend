@@ -205,7 +205,7 @@ export function BookForm({ book }: { book?: Book }) {
         />
         <Input
           label="Cover image address (optional)"
-          hint="A link only; Avuneri does not download it."
+          hint="An https:// link to an image. It is shown as the cover, loaded from that site; Avuneri does not store it."
           name="coverUrl"
           type="url"
           inputMode="url"

@@ -14,7 +14,7 @@ export function authorLine(authors: readonly string[]): string {
 export function BookSummary({ book, actions }: { book: Book; actions?: ReactNode }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-line bg-surface p-4">
-      <BookCover />
+      <BookCover src={book.coverUrl} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link
           href={`/library/books/${book.id}` as Route}

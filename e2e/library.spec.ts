@@ -428,3 +428,41 @@ test('unlabelled copies added the same day keep distinct, stable names', async (
     .click();
   await expect(page.getByRole('dialog')).toContainText(`Delete ${after[0]}?`);
 });
+
+test('a cover is shown from its https address, without a referrer, else the placeholder', async ({
+  page,
+  baseURL,
+}) => {
+  // A 1×1 PNG, served for a fictitious https address: nothing leaves the test machine.
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const referers: (string | undefined)[] = [];
+  await page.route('https://covers.example.test/**', (route) => {
+    referers.push(route.request().headers()['referer']);
+    return route.request().url().endsWith('/missing.png')
+      ? route.fulfill({ status: 404, body: '' })
+      : route.fulfill({ status: 200, contentType: 'image/png', body: png });
+  });
+  const shown = await libraryApi<{ id: string }>(page, baseURL!, 'POST', '/api/library/books', {
+    title: uniqueWord('Covered'),
+    format: 'ebook',
+    coverUrl: 'https://covers.example.test/dune.png',
+  });
+  const broken = await libraryApi<{ id: string }>(page, baseURL!, 'POST', '/api/library/books', {
+    title: uniqueWord('Broken cover'),
+    format: 'ebook',
+    coverUrl: 'https://covers.example.test/missing.png',
+  });
+
+  await page.goto(`/library/books/${shown.id}`);
+  const cover = page.locator('main img[src="https://covers.example.test/dune.png"]');
+  await expect(cover).toBeVisible();
+  expect(await cover.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  expect(referers.every((referer) => referer === undefined)).toBe(true);
+
+  await page.goto(`/library/books/${broken.id}`);
+  await expect(page.locator('main img')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Cover image' })).toBeVisible();
+});

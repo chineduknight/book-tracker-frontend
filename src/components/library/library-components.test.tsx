@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ActionError } from './action-error';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Book, PhysicalCopy } from '@/lib/library/types';
+import { BookCover } from './book-cover';
 import { BookForm } from './book-form';
 import { copyAddedOn, copyName } from './copies-manager';
 
@@ -175,5 +176,27 @@ describe('ActionError', () => {
     alert.parentElement!.blur();
     rerender(<ActionError error={{ code: 'RATE_LIMITED', message: 'x', retryAfterSeconds: 60 }} />);
     expect(screen.getByRole('alert').parentElement).toHaveFocus();
+  });
+});
+
+describe('BookCover', () => {
+  it('shows an https cover without sending a referrer, and the placeholder otherwise', () => {
+    const { container, rerender } = render(<BookCover src="https://covers.example/dune.jpg" />);
+    const image = container.querySelector('img')!;
+    expect(image).toHaveAttribute('src', 'https://covers.example/dune.jpg');
+    expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
+    expect(image).toHaveAttribute('alt', '');
+    for (const src of [undefined, 'http://covers.example/dune.jpg', 'not a url']) {
+      rerender(<BookCover src={src} />);
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('svg')).not.toBeNull();
+    }
+  });
+
+  it('falls back to the placeholder when the image cannot be loaded', () => {
+    const { container } = render(<BookCover src="https://covers.example/missing.jpg" />);
+    fireEvent.error(container.querySelector('img')!);
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('svg')).not.toBeNull();
   });
 });
