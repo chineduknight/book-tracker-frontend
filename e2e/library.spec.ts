@@ -466,3 +466,21 @@ test('a cover is shown from its https address, without a referrer, else the plac
   await expect(page.locator('main img')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Cover image' })).toBeVisible();
 });
+
+test('a new book can be put in categories as it is added', async ({ page, baseURL }) => {
+  const name = uniqueWord('Shelf');
+  await libraryApi(page, baseURL!, 'POST', '/api/library/categories', { name });
+  const title = uniqueWord('Categorised');
+
+  await page.goto('/library/new');
+  await page.getByLabel('Title').fill(title);
+  await page
+    .getByRole('group', { name: 'Categories (optional)' })
+    .getByRole('checkbox', { name })
+    .check();
+  await page.getByRole('button', { name: 'Add book' }).click();
+
+  await expect(page).toHaveURL(/\/library\/books\/[0-9a-f]{24}\?notice=book-created$/);
+  await expect(page.getByRole('status').filter({ hasText: 'Book added' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('link', { name, exact: true })).toBeVisible();
+});

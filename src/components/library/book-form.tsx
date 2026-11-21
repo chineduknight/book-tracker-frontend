@@ -19,7 +19,8 @@ import {
 import { readFormValues } from '@/lib/forms/read-form-values';
 import { hasErrors, type FieldErrors } from '@/lib/library/form-values';
 import { BOOK_FORMATS, FORMAT_LABELS, LIMITS } from '@/lib/library/rules';
-import type { Book } from '@/lib/library/types';
+import { sendToBff } from '@/lib/bff/bff-client';
+import type { Book, Group } from '@/lib/library/types';
 import { ActionError } from './action-error';
 import { DuplicateSuggestions } from './duplicate-suggestions';
 import { useBffAction } from './use-bff-action';
@@ -27,8 +28,12 @@ import { useFocusFirstInvalid } from './use-focus-first-invalid';
 
 const FIELDS = Object.keys(EMPTY_BOOK_FORM) as BookField[];
 
-/** Create (no `book`) or edit an existing catalogue entry. */
-export function BookForm({ book }: { book?: Book }) {
+/**
+ * Create (no `book`) or edit an existing catalogue entry. When creating, `categories` offers the
+ * reader's categories to put the new book in (`null`: they could not be loaded); on an existing
+ * book they are managed on its page.
+ */
+export function BookForm({ book, categories }: { book?: Book; categories?: Group[] | null }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -38,7 +43,10 @@ export function BookForm({ book }: { book?: Book }) {
   const [errors, setErrors] = useState<FieldErrors<BookField>>({});
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState('');
-  const { send, isPending, error, setError } = useBffAction();
+  const { send, isPending: isSaving, error, setError } = useBffAction();
+  // After the book is created, the chosen categories are added one request at a time.
+  const [isAddingToCategories, setIsAddingToCategories] = useState(false);
+  const isPending = isSaving || isAddingToCategories;
   useFocusFirstInvalid(formRef, attempt, errorRef);
 
   /** Fields are uncontrolled (see SignInForm); this only tracks what live UI needs. */
@@ -88,7 +96,30 @@ export function BookForm({ book }: { book?: Book }) {
       return;
     }
     const saved = result.data;
-    const destination = `/library/books/${saved?.id ?? book?.id}?notice=${book ? 'book-saved' : 'book-created'}`;
+    let notice = book ? 'book-saved' : 'book-created';
+    if (!book && saved) {
+      const chosen = [
+        // Not event.currentTarget: React clears it once the event has been handled (before
+        // the awaited save above finished).
+        ...(formRef.current?.querySelectorAll<HTMLInputElement>(
+          'input[name="categoryIds"]:checked',
+        ) ?? []),
+      ].map((input) => input.value);
+      if (chosen.length > 0) {
+        setIsAddingToCategories(true);
+        let failed = 0;
+        for (const categoryId of chosen) {
+          const added = await sendToBff(
+            'PUT',
+            `/api/library/categories/${categoryId}/books/${saved.id}`,
+          );
+          if (!added.ok) failed += 1;
+        }
+        // The book exists either way; its page says plainly if a category is missing.
+        if (failed > 0) notice = 'book-created-categories-incomplete';
+      }
+    }
+    const destination = `/library/books/${saved?.id ?? book?.id}?notice=${notice}`;
     router.push(destination as Route);
     router.refresh();
   }
@@ -222,6 +253,7 @@ export function BookForm({ book }: { book?: Book }) {
         defaultValue={initial.description}
         error={errors.description}
       />
+      {book ? null : <CategoryChoices categories={categories ?? null} />}
       <DuplicateSuggestions
         title={probe.title}
         isbn={probe.isbn}
@@ -242,5 +274,38 @@ export function BookForm({ book }: { book?: Book }) {
         {status}
       </p>
     </form>
+  );
+}
+
+/** The new book's categories: chosen here, added once the book exists. */
+function CategoryChoices({ categories }: { categories: Group[] | null }) {
+  return (
+    <fieldset className="flex min-w-0 flex-col gap-2" aria-describedby="book-categories-hint">
+      <legend className="mb-1 text-sm font-medium text-ink">Categories (optional)</legend>
+      <p id="book-categories-hint" className="text-xs text-ink-muted">
+        {categories === null
+          ? 'Your categories couldn’t be loaded, so none can be chosen here. Add the book, then choose its categories on its page.'
+          : categories.length === 0
+            ? 'You have no categories yet. Create them under Library → Categories; a book’s categories can also be changed on its page.'
+            : 'Choose any that fit. You can change them later on the book’s page.'}
+      </p>
+      {categories && categories.length > 0 ? (
+        <ul className="flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <li key={category.id} className="min-w-0 max-w-full">
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm wrap-anywhere text-ink has-[:checked]:border-accent has-[:checked]:bg-accent-soft">
+                <input
+                  type="checkbox"
+                  name="categoryIds"
+                  value={category.id}
+                  className="size-4 shrink-0 accent-[var(--accent)]"
+                />
+                {category.name}
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </fieldset>
   );
 }

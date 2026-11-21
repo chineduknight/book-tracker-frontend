@@ -4,11 +4,15 @@ import { LibraryBreadcrumb } from '@/components/library/library-breadcrumb';
 import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireSignedInProfile } from '@/server/current-session';
+import { listAllGroups } from '@/server/library/library-api';
+import { loadAsReader } from '@/server/library/reader-data';
 
 export const metadata: Metadata = { title: 'Add a book' };
 
 export default async function NewBookPage() {
   await requireSignedInProfile();
+  // Offered on the form; if they cannot be loaded the book can still be added.
+  const categories = await loadAsReader((api) => listAllGroups(api, 'categories'));
   return (
     <>
       <PageHeader
@@ -17,7 +21,7 @@ export default async function NewBookPage() {
         before={<LibraryBreadcrumb />}
       />
       <Card>
-        <BookForm />
+        <BookForm categories={categories.status === 'ok' ? categories.value : null} />
       </Card>
     </>
   );

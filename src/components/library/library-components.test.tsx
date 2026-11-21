@@ -200,3 +200,79 @@ describe('BookCover', () => {
     expect(container.querySelector('svg')).not.toBeNull();
   });
 });
+
+describe('BookForm categories (adding a book)', () => {
+  const group = (id: string, name: string) => ({
+    id: id.repeat(24),
+    name,
+    createdAt: NOW,
+    updatedAt: NOW,
+  });
+  const categories = [group('c', 'Philosophy'), group('d', 'Fiction'), group('e', 'Poetry')];
+  const created = 'a'.repeat(24);
+
+  /** Answers the create, then each category request in turn. */
+  function answer(...categoryStatuses: number[]) {
+    fetchMock.mockResolvedValueOnce(json(201, { data: { ...book, id: created } }));
+    for (const status of categoryStatuses) {
+      fetchMock.mockResolvedValueOnce(
+        status === 204
+          ? new Response(null, { status: 204 })
+          : json(status, { error: { code: 'SERVICE_UNAVAILABLE', message: 'x' } }),
+      );
+    }
+  }
+
+  async function addWith(names: string[]) {
+    const user = userEvent.setup();
+    render(<BookForm categories={categories} />);
+    await user.type(screen.getByLabelText('Title'), 'Meditations');
+    for (const name of names) await user.click(screen.getByRole('checkbox', { name }));
+    await user.click(screen.getByRole('button', { name: 'Add book' }));
+  }
+
+  it('creates the book, then adds it to each chosen category', async () => {
+    answer(204, 204);
+    await addWith(['Philosophy', 'Poetry']);
+    await waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith(`/library/books/${created}?notice=book-created`),
+    );
+    expect(writes().map(([url, init]) => `${init.method} ${url}`)).toEqual([
+      'POST /api/library/books',
+      `PUT /api/library/categories/${'c'.repeat(24)}/books/${created}`,
+      `PUT /api/library/categories/${'e'.repeat(24)}/books/${created}`,
+    ]);
+    // The book itself is sent without any category field.
+    expect(JSON.parse(writes()[0]![1].body)).not.toHaveProperty('categoryIds');
+  });
+
+  it('says so on the book page when a category could not be added', async () => {
+    answer(204, 503);
+    await addWith(['Philosophy', 'Fiction']);
+    await waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith(
+        `/library/books/${created}?notice=book-created-categories-incomplete`,
+      ),
+    );
+  });
+
+  it('sends no category request when none is chosen', async () => {
+    answer();
+    await addWith([]);
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    expect(writes()).toHaveLength(1);
+  });
+
+  it('explains an empty or unavailable list, and is absent when editing', () => {
+    const { rerender } = render(<BookForm categories={[]} />);
+    expect(screen.getByRole('group', { name: 'Categories (optional)' })).toHaveTextContent(
+      'You have no categories yet.',
+    );
+    rerender(<BookForm categories={null} />);
+    expect(screen.getByRole('group', { name: 'Categories (optional)' })).toHaveTextContent(
+      'couldn’t be loaded',
+    );
+    rerender(<BookForm book={book} />);
+    expect(screen.queryByRole('group', { name: 'Categories (optional)' })).not.toBeInTheDocument();
+  });
+});

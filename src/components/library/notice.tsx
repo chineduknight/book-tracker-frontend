@@ -3,6 +3,8 @@ import { CircleCheck } from 'lucide-react';
 /** Confirmation messages a page may show after a redirect. Only these keys are ever rendered. */
 const NOTICES = {
   'book-created': 'Book added to your library.',
+  'book-created-categories-incomplete':
+    'Book added to your library, but it couldn’t be added to every category you chose. Add the missing ones under Categories and collections below.',
   'book-saved': 'Changes saved.',
   'book-deleted': 'Book deleted. It no longer appears in your library, groups or searches.',
   'group-deleted': 'Deleted. Its books are still in your library.',
