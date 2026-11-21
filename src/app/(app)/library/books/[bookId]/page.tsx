@@ -176,7 +176,7 @@ function BookDetails({ book }: { book: Book }) {
   ];
   return (
     <div className="flex flex-col gap-5 @md:flex-row">
-      <BookCover className="w-20" />
+      <BookCover className="w-20" src={book.coverUrl} />
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <div className="flex flex-wrap gap-2">
           <Badge>{FORMAT_LABELS[book.format]}</Badge>

@@ -245,15 +245,22 @@ test('rate limiting and outages on writes are explained, and nothing looks saved
     }),
   );
   await page.getByRole('button', { name: 'Add book' }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('Wait about 2 minutes');
+  const problem = page.getByRole('main').getByRole('alert');
+  await expect(problem).toContainText('Wait about 2 minutes');
+  // Shown where the reader is looking, not only at the top of a long form: on a phone the
+  // button is far below it.
+  await expect(problem).toBeInViewport();
+  await expect(page.locator(':focus')).toContainText('Wait about 2 minutes');
   await expect(page).toHaveURL('/library/new');
 
   await page.unroute('**/api/library/books');
   await page.route('**/api/library/books', (route) =>
     route.fulfill({ status: 503, json: { error: { code: 'SERVICE_UNAVAILABLE', message: 'x' } } }),
   );
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.getByRole('button', { name: 'Add book' }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('Nothing was changed');
+  await expect(problem).toContainText('Nothing was changed');
+  await expect(problem).toBeInViewport();
   await expect(page).toHaveURL('/library/new');
 });
 
@@ -420,4 +427,60 @@ test('unlabelled copies added the same day keep distinct, stable names', async (
     .first()
     .click();
   await expect(page.getByRole('dialog')).toContainText(`Delete ${after[0]}?`);
+});
+
+test('a cover is shown from its https address, without a referrer, else the placeholder', async ({
+  page,
+  baseURL,
+}) => {
+  // A 1×1 PNG, served for a fictitious https address: nothing leaves the test machine.
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const referers: (string | undefined)[] = [];
+  await page.route('https://covers.example.test/**', (route) => {
+    referers.push(route.request().headers()['referer']);
+    return route.request().url().endsWith('/missing.png')
+      ? route.fulfill({ status: 404, body: '' })
+      : route.fulfill({ status: 200, contentType: 'image/png', body: png });
+  });
+  const shown = await libraryApi<{ id: string }>(page, baseURL!, 'POST', '/api/library/books', {
+    title: uniqueWord('Covered'),
+    format: 'ebook',
+    coverUrl: 'https://covers.example.test/dune.png',
+  });
+  const broken = await libraryApi<{ id: string }>(page, baseURL!, 'POST', '/api/library/books', {
+    title: uniqueWord('Broken cover'),
+    format: 'ebook',
+    coverUrl: 'https://covers.example.test/missing.png',
+  });
+
+  await page.goto(`/library/books/${shown.id}`);
+  const cover = page.locator('main img[src="https://covers.example.test/dune.png"]');
+  await expect(cover).toBeVisible();
+  expect(await cover.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  expect(referers.every((referer) => referer === undefined)).toBe(true);
+
+  await page.goto(`/library/books/${broken.id}`);
+  await expect(page.locator('main img')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Cover image' })).toBeVisible();
+});
+
+test('a new book can be put in categories as it is added', async ({ page, baseURL }) => {
+  const name = uniqueWord('Shelf');
+  await libraryApi(page, baseURL!, 'POST', '/api/library/categories', { name });
+  const title = uniqueWord('Categorised');
+
+  await page.goto('/library/new');
+  await page.getByLabel('Title').fill(title);
+  await page
+    .getByRole('group', { name: 'Categories (optional)' })
+    .getByRole('checkbox', { name })
+    .check();
+  await page.getByRole('button', { name: 'Add book' }).click();
+
+  await expect(page).toHaveURL(/\/library\/books\/[0-9a-f]{24}\?notice=book-created$/);
+  await expect(page.getByRole('status').filter({ hasText: 'Book added' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('link', { name, exact: true })).toBeVisible();
 });

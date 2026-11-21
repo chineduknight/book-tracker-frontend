@@ -100,6 +100,23 @@ describe('book form', () => {
     expect(errors.authors).toMatch(/20/);
     expect(hasErrors(validateBookForm({ ...EMPTY_BOOK_FORM, title: 'Ok' }))).toBe(false);
   });
+
+  it('explains a pasted embedded image instead of calling it a bad address', () => {
+    for (const coverUrl of [
+      `data:image/jpeg;base64,${'A'.repeat(3000)}`,
+      'DATA:image/png;base64,AAAA',
+      'blob:https://example.com/3f2a',
+    ]) {
+      const errors = validateBookForm({ ...EMPTY_BOOK_FORM, title: 'Ok', coverUrl });
+      expect(errors.coverUrl).toMatch(/embedded in a page/);
+    }
+    const ok = validateBookForm({
+      ...EMPTY_BOOK_FORM,
+      title: 'Ok',
+      coverUrl: 'https://x.test/a.jpg',
+    });
+    expect(ok.coverUrl).toBeUndefined();
+  });
 });
 
 describe('copy form', () => {
