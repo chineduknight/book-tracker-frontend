@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { ActionError } from './action-error';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Book, PhysicalCopy } from '@/lib/library/types';
@@ -158,5 +159,18 @@ describe('copyName', () => {
   it('keeps the reference next to a label, so copies with the same label differ too', () => {
     expect(copyName({ ...first, label: 'Paperback' })).toBe('Paperback #a10001');
     expect(copyName({ ...second, label: 'Paperback' })).toBe('Paperback #a10002');
+  });
+});
+
+describe('ActionError', () => {
+  it('takes focus when an error appears, and again for a new one', () => {
+    const { rerender } = render(<ActionError error={null} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    rerender(<ActionError error={{ code: 'SERVICE_UNAVAILABLE', message: 'x' }} />);
+    const alert = screen.getByRole('alert');
+    expect(alert.parentElement).toHaveFocus();
+    alert.parentElement!.blur();
+    rerender(<ActionError error={{ code: 'RATE_LIMITED', message: 'x', retryAfterSeconds: 60 }} />);
+    expect(screen.getByRole('alert').parentElement).toHaveFocus();
   });
 });

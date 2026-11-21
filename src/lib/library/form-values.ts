@@ -64,6 +64,12 @@ export function isbnProblem(value: string): string | undefined {
 export function urlProblem(value: string): string | undefined {
   const url = value.trim();
   if (url === '') return undefined;
+  // "Copy image address" on many sites and in search results gives an image embedded in the page,
+  // not a link to it. Say so plainly: the generic message is confusing when the field (showing only
+  // the end of a very long value) looks like an address.
+  if (/^(data|blob):/i.test(url)) {
+    return 'That is an image embedded in a page (it starts with “data:” or “blob:”), not a web address. Open the image on its own and copy the address that starts with https://.';
+  }
   if (url.length > LIMITS.url) return `Use at most ${LIMITS.url} characters.`;
   return isHttpUrl(url) ? undefined : 'Enter a full web address starting with https:// or http://.';
 }

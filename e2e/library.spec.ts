@@ -245,15 +245,22 @@ test('rate limiting and outages on writes are explained, and nothing looks saved
     }),
   );
   await page.getByRole('button', { name: 'Add book' }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('Wait about 2 minutes');
+  const problem = page.getByRole('main').getByRole('alert');
+  await expect(problem).toContainText('Wait about 2 minutes');
+  // Shown where the reader is looking, not only at the top of a long form: on a phone the
+  // button is far below it.
+  await expect(problem).toBeInViewport();
+  await expect(page.locator(':focus')).toContainText('Wait about 2 minutes');
   await expect(page).toHaveURL('/library/new');
 
   await page.unroute('**/api/library/books');
   await page.route('**/api/library/books', (route) =>
     route.fulfill({ status: 503, json: { error: { code: 'SERVICE_UNAVAILABLE', message: 'x' } } }),
   );
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.getByRole('button', { name: 'Add book' }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('Nothing was changed');
+  await expect(problem).toContainText('Nothing was changed');
+  await expect(problem).toBeInViewport();
   await expect(page).toHaveURL('/library/new');
 });
 
