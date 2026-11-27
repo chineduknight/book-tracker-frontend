@@ -30,4 +30,21 @@ describe('createSessionStoreClient', () => {
     expect(client.options.tls).toBeFalsy();
     await client.close();
   });
+
+  it('fails fast on the request path, and waits patiently for the operator index tool', async () => {
+    const location = {
+      uri: 'mongodb://db.example.net:27017/avuneri-bff',
+      databaseName: 'avuneri-bff',
+      requiresTls: true,
+    };
+    const requests = createSessionStoreClient(location, 'test');
+    expect(requests.options.waitQueueTimeoutMS).toBe(2_000);
+    expect(requests.options.socketTimeoutMS).toBe(4_000);
+    const operator = createSessionStoreClient(location, 'test', 'operator');
+    expect(operator.options.waitQueueTimeoutMS).toBe(30_000);
+    expect(operator.options.connectTimeoutMS).toBe(30_000);
+    expect(operator.options.socketTimeoutMS).toBe(120_000);
+    expect(operator.options.tls).toBe(true);
+    await Promise.all([requests.close(), operator.close()]);
+  });
 });
