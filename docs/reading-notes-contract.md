@@ -83,16 +83,18 @@ READING_SESSION_BOOK_MISMATCH`) is shown on the reading field.
   restore or permanent delete.
 - Distinct states: no notes yet, no matches, a page past the end, unavailable, and not found.
 
-## Safe presentation of Markdown and quotations
+## Safe presentation of formatting and quotations
 
-No Markdown renderer is used. Note content and commentary are shown as their **source text** in a
-monospaced, line-preserving block labelled "Written in Markdown · shown as plain text". Highlights
-are shown as a literal `<blockquote>`. Every value is a React text node: there is no
-`dangerouslySetInnerHTML`, no HTML parsing, no links or images created from note text, no previews
-and no remote loads. `<script>`, `<img onerror>`, `javascript:` links and tracking images appear as
-the characters typed. This avoids a new dependency and its XSS, link-protocol and tracker
-configuration surface. A carefully configured renderer can be considered later as a product
-decision.
+Since 2026-11-27 (owner decision; FE #18 showed source text only), note content and commentary
+are formatted by an in-house formatter (`src/lib/notes/format.ts`, rendered by
+`src/components/notes/formatted-note.tsx`): _bold_ / **bold** (WhatsApp-style single asterisks),
+_italic_, ~strike~, `code`, `mono`, # headings, lists, > quotes, code fences and web links.
+The parser produces data and the renderer builds React elements: there is no
+`dangerouslySetInnerHTML` and no HTML parsing. Only `http(s)` addresses become links (new tab,
+`noopener noreferrer nofollow`); images are not supported (`![…](…)` stays as typed), so no remote
+loads come from note text. `<script>`, `<img onerror>` and `javascript:` links appear as the
+characters typed. Highlights are shown as a literal `<blockquote>`, exactly as typed. List
+previews show the text without its marks.
 
 ## Request size
 

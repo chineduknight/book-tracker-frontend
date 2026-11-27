@@ -17,7 +17,7 @@ async function newBook(page: Page, origin: string) {
 const HOSTILE = '<img src=x onerror="window.pwned=1"> [link](javascript:window.pwned=2)';
 
 test(
-  'a book-level note: literal Markdown, edit, whole-word and chapter search, confirmed delete',
+  'a book-level note: formatting, hostile text kept inert, edit, whole-word and chapter search, confirmed delete',
   { tag: '@critical' },
   async ({ page, baseURL }) => {
     const book = await newBook(page, baseURL!);
@@ -30,7 +30,7 @@ test(
     await expect(page).toHaveURL(`/notes/new?bookId=${book.id}`);
     await expect(page.getByText(book.title, { exact: true })).toBeVisible();
     await page.getByRole('radio', { name: /^Note/ }).check();
-    const source = `# ${word}\n\n${HOSTILE}\n\n    indented   line`;
+    const source = `# ${word}\n\n${HOSTILE}\n\n*Bold* and _italic_, WhatsApp style\n- first point\n- second point`;
     await page.getByLabel('Your note').fill(source);
     await page.getByLabel('Chapter (optional)').fill('Chapter 3');
     await page.getByRole('button', { name: 'Save note' }).click();
@@ -38,8 +38,12 @@ test(
     await expect(page).toHaveURL(/\/notes\/[0-9a-f]{24}\?notice=note-created$/);
     const notePath = new URL(page.url()).pathname;
     const main = page.getByRole('main');
-    await expect(main.getByText('Written in Markdown · shown as plain text')).toBeVisible();
-    await expect(main.locator('.font-mono').first()).toHaveText(source);
+    // Formatting is applied as elements; the hostile line stays visible text that never runs.
+    await expect(main.getByText(word, { exact: true })).toHaveClass(/font-semibold/);
+    await expect(main.locator('strong', { hasText: 'Bold' })).toBeVisible();
+    await expect(main.locator('em', { hasText: 'italic' })).toBeVisible();
+    await expect(main.getByRole('listitem').filter({ hasText: 'point' })).toHaveCount(2);
+    await expect(main.getByText('<img src=x', { exact: false })).toBeVisible();
     await expect(main.locator('img, iframe, script, a[href^="javascript"]')).toHaveCount(0);
     expect(await page.evaluate(() => (window as { pwned?: number }).pwned)).toBeUndefined();
 
