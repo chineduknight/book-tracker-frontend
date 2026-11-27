@@ -52,7 +52,7 @@ const writes = () => fetchMock.mock.calls.filter(([, init]) => init?.method !== 
 
 describe('safe presentation', () => {
   it.each(['note', 'highlight'] as const)(
-    'shows %s text literally: no HTML, links, images or scripts',
+    'shows %s text safely: no HTML, images, scripts or non-web links',
     (kind) => {
       const { container } = render(
         <>
@@ -67,10 +67,24 @@ describe('safe presentation', () => {
     },
   );
 
-  it('labels Markdown truthfully and keeps a highlight’s line breaks as a quotation', () => {
-    render(<NoteContent note={{ kind: 'note', content: '# Title\n\n**bold**' }} />);
-    expect(screen.getByText('Written in Markdown · shown as plain text')).toBeInTheDocument();
+  it('formats a note, without reshaping the page outline, and keeps a quotation as typed', () => {
+    render(
+      <NoteContent
+        note={{
+          kind: 'note',
+          content: '# Title\n\n*bold* _italic_\n- one\n- two\nsee https://example.com',
+        }}
+      />,
+    );
+    expect(screen.getByText('Title')).toHaveClass('font-semibold');
     expect(screen.queryByRole('heading', { name: 'Title' })).toBeNull();
+    expect(screen.getByText('bold').tagName).toBe('STRONG');
+    expect(screen.getByText('italic').tagName).toBe('EM');
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['one', 'two']);
+    expect(screen.getByRole('link', { name: /example\.com/ })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer nofollow',
+    );
     const { container } = render(
       <NoteContent note={{ kind: 'highlight', content: 'line one\nline two' }} />,
     );

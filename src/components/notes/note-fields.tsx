@@ -55,7 +55,7 @@ export function NoteTextFields({
           hint={
             isHighlight
               ? 'The passage as it appears in the book, up to 5,000 characters. It is always shown exactly as typed.'
-              : 'Your own words, up to 20,000 characters. Markdown is fine; it is shown as written, not turned into formatting.'
+              : 'Your own words, up to 20,000 characters. Formatting: *bold*, _italic_, ~strikethrough~, `code`, # headings, - lists, > quotes and links.'
           }
           rows={isHighlight ? 6 : 12}
           defaultValue={initial.content}
@@ -70,7 +70,7 @@ export function NoteTextFields({
       <Textarea
         label="Commentary (optional)"
         name="commentary"
-        hint="Your thoughts on it, up to 5,000 characters, in Markdown if you like."
+        hint="Your thoughts on it, up to 5,000 characters. *bold*, _italic_, ~strikethrough~ and lists work here too."
         rows={4}
         defaultValue={initial.commentary}
         error={errors.commentary}

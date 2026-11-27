@@ -1,12 +1,15 @@
 import { Badge } from '@/components/ui/badge';
 import { NOTE_KIND_LABELS } from '@/lib/notes/rules';
+import { plainTextOf } from '@/lib/notes/format';
 import type { Note } from '@/lib/notes/types';
+import { FormattedNote } from './formatted-note';
 
 /*
- * Safe presentation of untrusted, reader-written text. Nothing here interprets Markdown or HTML:
- * every value is a React text node, so `<script>`, `<img onerror>`, `javascript:` links and remote
- * images are shown as the characters they are and never load or run. Line breaks and spacing are
- * preserved with CSS. No `dangerouslySetInnerHTML`, no renderer, no previews.
+ * Safe presentation of untrusted, reader-written text. Notes and commentary are formatted by a
+ * small in-house formatter (formatted-note.tsx) that builds React elements, never HTML, so
+ * `<script>`, `<img onerror>`, `javascript:` links and remote images stay the characters they are
+ * and never load or run. A highlight's quotation is shown exactly as typed. No
+ * `dangerouslySetInnerHTML`, no previews of linked pages.
  */
 
 export function NoteKindBadge({ note }: { note: Pick<Note, 'kind'> }) {
@@ -39,7 +42,7 @@ export function noteExcerpt(text: string, max = 280): string {
 
 const SOURCE_TEXT = 'whitespace-pre-wrap break-words text-ink';
 
-/** A note's Markdown source or a highlight's quotation, as literal text. */
+/** A note, formatted; or a highlight's quotation, exactly as typed. */
 export function NoteContent({ note }: { note: Pick<Note, 'kind' | 'content'> }) {
   if (note.kind === 'highlight') {
     return (
@@ -51,35 +54,22 @@ export function NoteContent({ note }: { note: Pick<Note, 'kind' | 'content'> }) 
       </figure>
     );
   }
-  return (
-    <div className="flex flex-col gap-1">
-      <p className="text-xs font-medium text-ink-muted">
-        Written in Markdown · shown as plain text
-      </p>
-      <div className={`rounded-lg bg-surface-muted p-4 font-mono text-sm ${SOURCE_TEXT}`}>
-        {note.content}
-      </div>
-    </div>
-  );
+  return <FormattedNote source={note.content} />;
 }
 
 export function NoteCommentary({ commentary }: { commentary: string | undefined }) {
   if (commentary === undefined) return null;
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-xs font-medium text-ink-muted">
-        Your commentary · Markdown shown as plain text
-      </p>
-      <div className={`rounded-lg bg-surface-muted p-4 font-mono text-sm ${SOURCE_TEXT}`}>
-        {commentary}
-      </div>
+      <p className="text-xs font-medium text-ink-muted">Your commentary</p>
+      <FormattedNote source={commentary} />
     </div>
   );
 }
 
-/** A short, literal preview for lists: highlights in quotation marks, notes as written. */
+/** A short preview for lists: highlights in quotation marks, notes without formatting marks. */
 export function NoteExcerpt({ note }: { note: Pick<Note, 'kind' | 'content'> }) {
-  const excerpt = noteExcerpt(note.content);
+  const excerpt = noteExcerpt(note.kind === 'highlight' ? note.content : plainTextOf(note.content));
   return (
     <p className="line-clamp-4 text-sm whitespace-pre-line break-words text-ink">
       {note.kind === 'highlight' ? `“${excerpt}”` : excerpt}

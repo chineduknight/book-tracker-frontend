@@ -88,7 +88,7 @@ Also: [account menu at 320px and 200% text](evidence/fe20/after-320-200pct-accou
 
 | Priority | Item                                                                                       | Owner action                                                            |
 | -------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| P1       | D1: in Safari and on iOS, Back discards unsaved changes without asking                     | Accept for V1, or ask for a mitigation, after the manual Safari check   |
+| Done     | D1: in Safari and on iOS, Back discards unsaved changes without asking                     | Accepted by the owner on 2026-11-27                                     |
 | P1       | D2: API authentication limits shared by all readers behind the BFF                         | Accept for a small V1 or approve an API/edge change; measure on staging |
 | P1       | Every Gate B check (real HTTPS, cookies, indexes, BE #14 staging gates, latency, rollback) | Approve staging scope and budget                                        |
 | P2       | Manual Safari + VoiceOver, keyboard-only, TalkBack, 400% zoom, on-screen keyboard          | Run on devices; record in qa-matrix.md                                  |

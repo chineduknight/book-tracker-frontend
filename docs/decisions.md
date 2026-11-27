@@ -123,9 +123,14 @@ Recorded in detail in [reading-notes-contract.md](reading-notes-contract.md). Th
   FE #17 pipeline; there is no second session mechanism. Note writes declare their own 100 kB body
   cap (the API's limit). Library stays at 32 KiB and authentication at 8 KiB, each enforced on
   streamed bytes.
-- **No Markdown renderer.** Note source and quotations are shown as literal text with an honest
-  label. Rendering untrusted Markdown safely needs a new dependency plus careful link, image and
-  HTML configuration, for a cosmetic gain; it can be revisited as a product decision.
+- **Note formatting (revised 2026-11-27, owner decision).** FE #18 showed notes as literal source
+  text. They are now formatted by a small in-house formatter (`src/lib/notes/format.ts`) rather
+  than a Markdown dependency: it produces data that is rendered as React elements, never HTML.
+  Supported: _bold_ and **bold** (single asterisks are bold, as on WhatsApp, by owner decision),
+  _italic_, ~strike~, `code`, `mono`, # headings (styled, not page headings), - and 1. lists,
+  > quotes, code fences, and links to web addresses only (new tab, no referrer). HTML, images,
+  > `javascript:` and other links stay the characters typed. Marks count only at word boundaries.
+  > A highlight's quotation is still shown exactly as typed.
 - **Explicit transitions only.** Finishing is a separate, confirmed action. Nothing auto-completes
   at the last page or invents a date. `in_progress` is never sent on PATCH. Rereads are new readings.
 - **Degrade by section.** The book page loads reading and notes separately, so an outage there
