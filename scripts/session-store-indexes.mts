@@ -18,7 +18,8 @@ import { createSessionStoreClient } from '../src/server/session/session-store-cl
 const apply = process.argv.includes('--apply');
 const location = loadSessionStoreLocation();
 const { databaseName } = location;
-const client = createSessionStoreClient(location, 'avuneri-bff-indexes');
+// Operator limits: run by hand, often far from the cluster; an index build may take a while.
+const client = createSessionStoreClient(location, 'avuneri-bff-indexes', 'operator');
 
 try {
   const collection = client.db(databaseName).collection(SESSION_COLLECTION);
